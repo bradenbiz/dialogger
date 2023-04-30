@@ -1,2 +1,0 @@
-# dialogger
-dialogger.dev
