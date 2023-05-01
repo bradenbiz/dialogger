@@ -12,6 +12,7 @@
   "author": "Plaza Software",
   "license": "MIT",
   "dependencies": {
+    "treeviz": "^2.3.0",
     "typescript": "^5.0.4",
     "vite": "^4.3.3"
   }
