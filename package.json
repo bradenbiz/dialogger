@@ -12,8 +12,19 @@
   "author": "Plaza Software",
   "license": "MIT",
   "dependencies": {
-    "treeviz": "^2.3.0",
+    "@types/d3-hierarchy": "^2.0.0",
+    "@types/d3-selection": "^2.0.0",
+    "@types/d3-zoom": "^2.0.0",
+    "d3-hierarchy": "^2.0.0",
+    "d3-selection": "^2.0.0",
+    "d3-zoom": "^2.0.0",
     "typescript": "^5.0.4",
-    "vite": "^4.3.3"
+    "vite": "^4.3.3",
+    "vite-tsconfig-paths": "^4.2.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.23",
+    "tailwindcss": "^3.3.2"
   }
 }

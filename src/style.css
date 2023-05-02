@@ -1,7 +1,11 @@
-body, html { margin: 0; }
-#tree { width: 100vw; height: 100vh; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-.node {
-    background-color: grey;
-    border-radius:5px;
+body, html { margin: 0; overflow: hidden; }
+body, html, body * { box-sizing: border-box; }
+#tree { width: 100vw; height: 100vh;}
+
+.node:hover .add {
+    display: block;
 }

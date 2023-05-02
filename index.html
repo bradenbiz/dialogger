@@ -4,13 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <title>Vite + TS</title>
   </head>
   <body>
     <div id="tree"></div>
-    <script>
-      var parcelRequire;
-    </script>
+    <div id="zoom" class="fixed bottom-4 right-4 flex gap-4">
+      <button id="zoomIn" class="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">+</button>
+      <button id="zoomOut" class="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">-</button>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
