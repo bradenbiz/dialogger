@@ -12,7 +12,7 @@ export interface ITreeConfig {
   linkShape?: "quadraticBeziers" | "curve" | "orthogonal" | "";
   linkColor: (node: any) => string;
   linkWidth: (node: any) => number;
-  onNodeClick: (node: any) => void;
+  onNodeClick: (event: PointerEvent, node: any) => void;
   onNodeMouseEnter: (node: any) => void;
   onNodeMouseLeave: (node: any) => void;
   isHorizontal: boolean;

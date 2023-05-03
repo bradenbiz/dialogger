@@ -1,5 +1,6 @@
 import './style.css';
 import * as Treeviz from 'treeviz';
+import { ExtendedHierarchyPointNode } from './libs/treeviz/typings';
 
 interface Transform {
     x: number,
@@ -75,9 +76,9 @@ var myTree = Treeviz.create({
     secondaryAxisNodeSpacing: 3,
     hasPan: true,
     hasZoom: true,
-    linkWidth: (nodeData: NodeData) => 3,
+    linkWidth: () => 3,
     linkShape: "quadraticBeziers",
-    linkColor: (nodeData: NodeData) => "#B0BEC5",
+    linkColor: () => "#B0BEC5",
     onNodeClick: (event: PointerEvent, node: any) => {
         if ((event.target as Element).classList.contains('add')) {
             const id = new Date().getTime()
@@ -88,7 +89,7 @@ var myTree = Treeviz.create({
             input?.addEventListener("blur", () => onBlur(input) );
         }
         if ((event.target as Element).classList.contains('delete')) {
-            const toDelete = [node.data.id].concat(node.children?.map(i => i.data.id) || []);
+            const toDelete = [node.data.id].concat(node.children?.map((i: ExtendedHierarchyPointNode) => (i.data as NodeData).id) || []);
             data = data.filter(i => toDelete.indexOf(i.id) === -1);
             myTree.refresh(data);
         }
@@ -102,8 +103,6 @@ var myTree = Treeviz.create({
         console.log('node', node, event);
         
     },
-    onNodeMouseEnter: (nodeData: NodeData) => { },
-    onNodeMouseLeave: (node: NodeData) => { },
     renderNode: (node) => {
         console.log(node);
         return `
@@ -191,22 +190,34 @@ document.getElementById('zoomOut')?.addEventListener('click', () => scrollTo(nul
 document.getElementById('fullscreen')?.addEventListener('click', () => {
     document.getElementById('fullscreen')?.classList.add('hidden');
     document.getElementById('unfullscreen')?.classList.remove('hidden');
+    // @ts-ignore
     if (document.documentElement.requestFullscreen) {
+    // @ts-ignore
         document.documentElement.requestFullscreen();
+    // @ts-ignore
     } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+    // @ts-ignore
         document.documentElement.webkitRequestFullscreen();
+    // @ts-ignore
     } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+    // @ts-ignore
         document.documentElement.msRequestFullscreen();
     }
 });
 document.getElementById('unfullscreen')?.addEventListener('click', () => {
     document.getElementById('fullscreen')?.classList.remove('hidden');
     document.getElementById('unfullscreen')?.classList.add('hidden');
+    // @ts-ignore
     if (document.exitFullscreen) {
+    // @ts-ignore
         document.exitFullscreen();
+    // @ts-ignore
     } else if (document.webkitExitFullscreen) { /* Safari */
+    // @ts-ignore
         document.webkitExitFullscreen();
+    // @ts-ignore
     } else if (document.msExitFullscreen) { /* IE11 */
+    // @ts-ignore
         document.msExitFullscreen();
     }
 });

@@ -1,5 +1,4 @@
 // Got to import d3 two times because of an issue with Webpack/Babel with d3.event
-import { transform } from "typescript";
 import d3 from "./d3";
 import { ITreeConfig } from "./typings";
 import { getAreaSize } from "./utils";
