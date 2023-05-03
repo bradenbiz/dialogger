@@ -18,8 +18,8 @@ enum NodeType {
     'question',
     'idea',
     'decision',
-    'positive',
-    'negative'
+    'pro',
+    'con'
 } 
 
 interface NodeData {
@@ -37,9 +37,9 @@ const getColor = (type: NodeType) => {
             return 'bg-[#FCFF77] border-[#C8CC00]';
         case NodeType.decision:
             return 'bg-[#A7EFFF] border-[#00A7CC]';
-        case NodeType.positive:
+        case NodeType.pro:
             return 'bg-[#BFFFA8] border-[#35CC00]';
-        case NodeType.negative:
+        case NodeType.con:
             return 'bg-[#FFA8A8] border-[#CC0000]';
     }
 }
@@ -52,9 +52,9 @@ const getIcon = (type: NodeType) => {
             return 'fas fa-lightbulb';
         case NodeType.decision:
             return 'fas fa-circle-check';
-        case NodeType.positive:
+        case NodeType.pro:
             return 'fas fa-circle-plus';
-        case NodeType.negative:
+        case NodeType.con:
             return 'fas fa-circle-minus';
     }
 }
@@ -64,9 +64,15 @@ let data: NodeData[] = [
     { id: 1, label: "Chicken or egg first?", type: NodeType.question, parent: null },
     { id: 2, label: "Chicken", type: NodeType.idea, parent: 1 },
     { id: 3, label: "Egg", type: NodeType.decision, parent: 1 },
-    { id: 4, label: "Chickens hatch from them", type: NodeType.positive, parent: 3 },
-    { id: 5, label: "Impossible", type: NodeType.negative, parent: 3 },
-    { id: 6, label: "Chicken or egg first?", type: NodeType.question, parent: null },
+    { id: 4, label: "Taste good", type: NodeType.pro, parent: 3 },
+    { id: 5, label: "Impossible", type: NodeType.con, parent: 3 },
+    { id: 6, label: "Best car manufacturer?", type: NodeType.question, parent: null },
+    { id: 7, label: "Toyota", type: NodeType.decision, parent: 6 },
+    { id: 8, label: "Ford", type: NodeType.idea, parent: 6 },
+    { id: 9, label: "Mini Cooper", type: NodeType.idea, parent: 6 },
+    { id: 10, label: "Rare", type: NodeType.con, parent: 9 },
+    { id: 10, label: "Reliability", type: NodeType.pro, parent: 7 },
+    { id: 11, label: "Import costs", type: NodeType.con, parent: 7 },
 ];
 
 // Define and configure a tree object
@@ -116,8 +122,8 @@ var myTree = Treeviz.create({
                 <i data-type="${NodeType.question}" class="changeType ${getIcon(NodeType.question)} ${getColor(NodeType.question)} text-xs hidden cursor-pointer absolute -left-3 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
                 <i data-type="${NodeType.idea}" class="changeType ${getIcon(NodeType.idea)} ${getColor(NodeType.idea)} text-xs hidden cursor-pointer absolute left-4 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
                 <i data-type="${NodeType.decision}" class="changeType ${getIcon(NodeType.decision)} ${getColor(NodeType.decision)} text-xs hidden cursor-pointer absolute left-12 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.positive}" class="changeType ${getIcon(NodeType.positive)} ${getColor(NodeType.positive)} text-xs hidden cursor-pointer absolute left-20 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.negative}" class="changeType ${getIcon(NodeType.negative)} ${getColor(NodeType.negative)} text-xs hidden cursor-pointer absolute left-28 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.pro}" class="changeType ${getIcon(NodeType.pro)} ${getColor(NodeType.pro)} text-xs hidden cursor-pointer absolute left-20 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.con}" class="changeType ${getIcon(NodeType.con)} ${getColor(NodeType.con)} text-xs hidden cursor-pointer absolute left-28 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
             </div>
         `;
     },
@@ -144,12 +150,12 @@ const getGraph = () => {
 }
 
 const centerGraph = () => {
-    const g = getGraph();
-    const rect = g?.getBoundingClientRect();
-    if (!rect) { return }
-    // TODO center?
-    // rect.width / 2
-    scrollTo(300, null, 0.8);
+    // const g = getGraph();
+    // const rect = g?.getBoundingClientRect();
+    // if (!rect) { return }
+    // // TODO center?
+    // // rect.width / 2
+    // scrollTo(300, null, 0.8);
 }
 
 const scrollTo = (x: number | null, y: number | null, z: number | null) => {
@@ -247,9 +253,9 @@ document.getElementById('unfullscreen')?.addEventListener('click', () => {
     }
 });
 
-// window.setTimeout(() => {
-//     centerGraph();
-// }, 0)
+window.setTimeout(() => {
+    centerGraph();
+}, 0)
 
 
 
