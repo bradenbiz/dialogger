@@ -8,10 +8,31 @@
     <title>Vite + TS</title>
   </head>
   <body>
+    <header class="fixed top-0 left-0 w-full backdrop-blur bg-white/50 flex justify-between p-4">
+        <div>
+            <i class="fas fa-share-nodes"></i>
+        </div>
+        <div>
+            <b>Example Diagram</b>
+        </div>
+        <div>
+            <i class="fas fa-cog"></i>
+        </div>
+    </header>
     <div id="tree"></div>
     <div id="zoom" class="fixed bottom-4 right-4 flex gap-4">
-      <button id="zoomIn" class="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">+</button>
-      <button id="zoomOut" class="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">-</button>
+      <!-- <button id="zoomIn" class="bg-black hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">
+        <i class="fas fa-plus"></i>
+      </button>
+      <button id="zoomOut" class="bg-black hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">
+        <i class="fas fa-minus"></i>
+      </button> -->
+      <button id="fullscreen" class="hover:opacity-80">
+        <i class="fas fa-expand"></i>
+      </button>
+      <button id="unfullscreen" class="hidden hover:opacity-80">
+        <i class="fas fa-compress"></i>
+      </button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

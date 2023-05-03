@@ -12,10 +12,10 @@ let currTransform: Transform = {z: 1, x: 0, y: 0}
 enum NodeType {
     'question',
     'idea',
+    'decision',
     'positive',
     'negative'
 } 
-
 
 interface NodeData {
     id: number,
@@ -27,21 +27,38 @@ interface NodeData {
 const getColor = (type: NodeType) => {
     switch(type) {
         case NodeType.question:
-            return 'bg-gray-200';
+            return 'bg-[#DDA6FF] border-[#857CE9]';
         case NodeType.idea:
-            return 'bg-yellow-200';
+            return 'bg-[#FCFF77] border-[#C8CC00]';
+        case NodeType.decision:
+            return 'bg-[#A7EFFF] border-[#00A7CC]';
         case NodeType.positive:
-            return 'bg-green-300';
+            return 'bg-[#BFFFA8] border-[#35CC00]';
         case NodeType.negative:
-            return 'bg-red-300';
+            return 'bg-[#FFA8A8] border-[#CC0000]';
+    }
+}
+
+const getIcon = (type: NodeType) => {
+    switch(type) {
+        case NodeType.question:
+            return 'fas fa-comment-dots';
+        case NodeType.idea:
+            return 'fas fa-lightbulb';
+        case NodeType.decision:
+            return 'fas fa-circle-check';
+        case NodeType.positive:
+            return 'fas fa-circle-plus';
+        case NodeType.negative:
+            return 'fas fa-circle-minus';
     }
 }
 
 // Define a dataset
-var data: NodeData[] = [
+let data: NodeData[] = [
     { id: 1, label: "Chicken or egg first?", type: NodeType.question, parent: null },
     { id: 2, label: "Chicken", type: NodeType.idea, parent: 1 },
-    { id: 3, label: "Egg", type: NodeType.idea, parent: 1 },
+    { id: 3, label: "Egg", type: NodeType.decision, parent: 1 },
     { id: 4, label: "Chickens hatch from them", type: NodeType.positive, parent: 3 },
     { id: 5, label: "Impossible", type: NodeType.negative, parent: 3 }
 ];
@@ -56,22 +73,51 @@ var myTree = Treeviz.create({
     nodeHeight: 50,
     mainAxisNodeSpacing: 2,
     secondaryAxisNodeSpacing: 3,
-    hasPan: false,
-    hasZoom: false,
-    linkWidth: (nodeData: NodeData) => 5,
+    hasPan: true,
+    hasZoom: true,
+    linkWidth: (nodeData: NodeData) => 3,
     linkShape: "quadraticBeziers",
     linkColor: (nodeData: NodeData) => "#B0BEC5",
-    onNodeClick: (nodeData: NodeData) => console.log(nodeData),
-    // nodeColor: (nodeData) => "grey",
+    onNodeClick: (event: PointerEvent, node: any) => {
+        if ((event.target as Element).classList.contains('add')) {
+            const id = new Date().getTime()
+            data.push({ id, label: "", type: NodeType.idea, parent: node.data.id });
+            myTree.refresh(data);   
+            const input = document.getElementById(id.toString())?.querySelector('input');
+            input?.focus();
+            input?.addEventListener("blur", () => onBlur(input) );
+        }
+        if ((event.target as Element).classList.contains('delete')) {
+            const toDelete = [node.data.id].concat(node.children?.map(i => i.data.id) || []);
+            data = data.filter(i => toDelete.indexOf(i.id) === -1);
+            myTree.refresh(data);
+        }
+        if ((event.target as Element).classList.contains('changeType')) {
+            const dataNode = data.find(i => i.id === node.data.id);
+            const type = (event.target as Element).getAttribute("data-type");
+            if (!dataNode || !type) { return }
+            dataNode.type = parseInt(type) as NodeType;
+            myTree.refresh(data);
+        }
+        console.log('node', node, event);
+        
+    },
     onNodeMouseEnter: (nodeData: NodeData) => { },
     onNodeMouseLeave: (node: NodeData) => { },
     renderNode: (node) => {
         console.log(node);
         return `
-            <div class="node flex items-center ${getColor(node.data.type)} border-white border-4 rounded-lg p-2 relative" style="width:  ${node.settings.nodeWidth}px; height: ${node.settings.nodeHeight}px;">
-                <i class="fas fa-lightbulb mr-2 text-black/40"></i>
-                ${node.data.label}
-                <button class="add hidden absolute -right-3 bg-green-600 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-green-700">+</button>
+            <div id="${node.data.id}" class="node flex items-center ${getColor(node.data.type)} border-white border-2 rounded-lg p-2 relative" style="width:  ${node.settings.nodeWidth}px; height: ${node.settings.nodeHeight}px;">
+                <i class="${getIcon(node.data.type)} text-3xl mr-2 text-black/40"></i>
+                <input data-id="${node.data.id}" type="text" class="bg-transparent" value="${node.data.label}">
+                <i class="add fas fa-plus text-sm hidden cursor-pointer absolute -right-3 -top-3 bg-green-600 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-green-700"></i>
+                <i class="delete fas fa-trash text-xs ${node.data.parent ? 'hidden' : '!hidden'} cursor-pointer absolute -right-3 -bottom-3 bg-red-400 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-red-500"></i>
+                
+                <i data-type="${NodeType.question}" class="changeType ${getIcon(NodeType.question)} ${getColor(NodeType.question)} text-xs hidden cursor-pointer absolute -left-3 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.idea}" class="changeType ${getIcon(NodeType.idea)} ${getColor(NodeType.idea)} text-xs hidden cursor-pointer absolute left-4 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.decision}" class="changeType ${getIcon(NodeType.decision)} ${getColor(NodeType.decision)} text-xs hidden cursor-pointer absolute left-12 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.positive}" class="changeType ${getIcon(NodeType.positive)} ${getColor(NodeType.positive)} text-xs hidden cursor-pointer absolute left-20 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.negative}" class="changeType ${getIcon(NodeType.negative)} ${getColor(NodeType.negative)} text-xs hidden cursor-pointer absolute left-28 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
             </div>
         `;
     },
@@ -80,6 +126,17 @@ var myTree = Treeviz.create({
 
 // Display the tree based on the data
 myTree.refresh(data);
+
+const onBlur = (el: HTMLInputElement) => {
+    console.log('blurring', el, el.value)
+    const id = el.getAttribute("data-id");
+    if (!id) { return }
+    const foundData = data.find(i => i.id.toString() == id);
+    if (!foundData) { return }
+    foundData.label = el.value;
+    console.log(data);
+    myTree.refresh(data);
+}
 
 const getGraph = () => {
     const tree = document.getElementById('tree');
@@ -124,8 +181,35 @@ const decrement = (axis: Extract<keyof Transform, string>, target: number, amoun
     return currTransform[axis] > target ? currTransform[axis] += amount : target;
 }
 
+Array.from(document.querySelectorAll('input')).forEach((el) => {
+    console.log('an el is', el)
+    el.addEventListener("blur", () => onBlur(el) );
+});
+
 document.getElementById('zoomIn')?.addEventListener('click', () => scrollTo(null, null, currTransform.z += 0.1));
-document.getElementById('zoomOut')?.addEventListener('click', () => scrollTo(null, null, currTransform.z += -0.1))
+document.getElementById('zoomOut')?.addEventListener('click', () => scrollTo(null, null, currTransform.z += -0.1));
+document.getElementById('fullscreen')?.addEventListener('click', () => {
+    document.getElementById('fullscreen')?.classList.add('hidden');
+    document.getElementById('unfullscreen')?.classList.remove('hidden');
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+    } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+        document.documentElement.webkitRequestFullscreen();
+    } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+        document.documentElement.msRequestFullscreen();
+    }
+});
+document.getElementById('unfullscreen')?.addEventListener('click', () => {
+    document.getElementById('fullscreen')?.classList.remove('hidden');
+    document.getElementById('unfullscreen')?.classList.add('hidden');
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) { /* Safari */
+        document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) { /* IE11 */
+        document.msExitFullscreen();
+    }
+});
 
 window.setTimeout(() => {
     centerGraph();
