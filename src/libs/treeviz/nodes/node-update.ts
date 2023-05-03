@@ -31,5 +31,9 @@ export const drawNodeUpdate = (
     .on("click", settings.onNodeClick)
     .on("mouseenter", settings.onNodeMouseEnter)
     .on("mouseleave", settings.onNodeMouseLeave)
-    .html((d) => settings.renderNode({ ...d, settings }));
+    .html((d) => {
+      // Format data back to the way user expects it
+      if (d.depth === 1) { (d.data as any)[settings.relationnalField] = null; }
+      return d.parent ? settings.renderNode({ ...d, settings }) : ``;
+    });
 };
