@@ -4,8 +4,6 @@ import { ITreeConfig } from "./typings";
 import { getAreaSize } from "./utils";
 
 export const initiliazeSVG = (treeConfig: ITreeConfig) => {
-
-  console.log('starting init');
   const {
     htmlId,
     isHorizontal,
@@ -47,7 +45,7 @@ export const initiliazeSVG = (treeConfig: ITreeConfig) => {
   // Create a G container and move it according to the Zoom Behavior attached to the main <svg> element
   const ZoomContainer = svg.append("g");
   const zoom = d3.zoom().on("zoom", (e) => {
-    console.log('zooming', e);
+    // console.log('zooming', e);
     ZoomContainer.attr("transform", () => e.transform);
   });
 
