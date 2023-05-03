@@ -2,6 +2,10 @@ import './style.css';
 import * as Treeviz from 'treeviz';
 import { ExtendedHierarchyPointNode } from './libs/treeviz/typings';
 
+const toProperCase = function (str: string) {
+    return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+};
+
 interface Transform {
     x: number,
     y: number,
@@ -95,16 +99,17 @@ var myTree = Treeviz.create({
             if (!dataNode || !type) { return }
             dataNode.type = parseInt(type) as NodeType;
             myTree.refresh(data);
-        }
-        console.log('node', node, event);
-        
+            setTimeout(() => {
+                removeInputListeners();
+                addInputListeners();
+            }, 500)
+        }        
     },
     renderNode: (node) => {
-        console.log('render node', node);
         return `
             <div id="${node.data.id}" class="node flex items-center ${getColor(node.data.type)} border-2 rounded-lg p-2 relative" style="width:  ${node.settings.nodeWidth}px; height: ${node.settings.nodeHeight}px;">
                 <i class="${getIcon(node.data.type)} text-3xl mr-2 text-black/40"></i>
-                <input data-id="${node.data.id}" type="text" class="bg-transparent" value="${node.data.label}">
+                <input data-id="${node.data.id}" type="text" placeholder="New ${toProperCase(NodeType[node.data.type])}" class="bg-transparent placeholder-black/30" value="${node.data.label}">
                 <i class="add fas fa-plus text-sm hidden cursor-pointer absolute -right-3 -top-3 bg-green-600 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-green-700"></i>
                 <i class="delete fas fa-trash text-xs hidden cursor-pointer absolute -right-3 -bottom-3 bg-red-400 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-red-500"></i>
                 
@@ -123,14 +128,14 @@ var myTree = Treeviz.create({
 myTree.refresh(data);
 
 const onBlur = (el: HTMLInputElement) => {
-    console.log('blurring', el, el.value)
     const id = el.getAttribute("data-id");
     if (!id) { return }
     const foundData = data.find(i => i.id.toString() == id);
     if (!foundData) { return }
     foundData.label = el.value;
-    console.log(data);
-    myTree.refresh(data);
+    console.log('blurring', el, el.value, foundData)
+    // console.log(data);
+    // myTree.refresh(data);
 }
 
 const getGraph = () => {
@@ -176,18 +181,31 @@ const decrement = (axis: Extract<keyof Transform, string>, target: number, amoun
     return currTransform[axis] > target ? currTransform[axis] += amount : target;
 }
 
-Array.from(document.querySelectorAll('input')).forEach((el) => {
-    console.log('an el is', el)
-    el.addEventListener("blur", () => onBlur(el) );
-});
+const addInputListeners = () => {
+    Array.from(document.querySelectorAll('input')).forEach((el) => {
+        el.addEventListener("blur", () => onBlur(el) );
+    });
+} 
+
+const removeInputListeners = () => {
+    Array.from(document.querySelectorAll('input')).forEach((el) => {
+        el.removeEventListener("blur", () => onBlur(el) );
+    });
+} 
+
+addInputListeners();
 
 const add = (parent: number | null = null) => {
     const id = new Date().getTime();
     data.push({ id, label: "", type: NodeType.question, parent });
     myTree.refresh(data);   
-    const input = document.getElementById(id.toString())?.querySelector('input');
-    input?.focus();
-    input?.addEventListener("blur", () => onBlur(input) );
+    window.setTimeout(() => {
+        const input = document.getElementById(id.toString())?.querySelector('input');
+        input?.focus();
+        removeInputListeners();
+        addInputListeners();
+    }, 500)
+   
 }
 
 document.getElementById('add')?.addEventListener('click', () => add());
@@ -229,9 +247,9 @@ document.getElementById('unfullscreen')?.addEventListener('click', () => {
     }
 });
 
-window.setTimeout(() => {
-    centerGraph();
-}, 0)
+// window.setTimeout(() => {
+//     centerGraph();
+// }, 0)
 
 
 
