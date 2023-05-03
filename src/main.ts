@@ -89,16 +89,16 @@ console.log("nodeData", nodeData);
 
 // #endregion
 
-const addQuestion = (text: string): void => {};
-const addIdea = (text: string): void => {};
-const addPro = (text: string): void => {};
-const addCon = (text: string): void => {};
-const addDecision = (text: string): void => {};
+const addQuestion = (text: string): void => { console.log(text) };
+// const addIdea = (text: string): void => {};
+// const addPro = (text: string): void => {};
+// const addCon = (text: string): void => {};
+// const addDecision = (text: string): void => {};
 
 addQuestion("blah");
 
 graph.addNode("John", { x: 0, y: 10, size: 5, label: "John", color: "blue" });
 // graph.addEdge("John", "Mary");s
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const renderer = new Sigma(graph, container);
+console.log(renderer);
