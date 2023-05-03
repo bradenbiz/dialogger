@@ -10,6 +10,7 @@ import { drawNodeUpdate } from "./nodes/node-update";
 import { generateBasicTreemap, generateNestedData } from "./prepare-data";
 import { ExtendedHierarchyPointNode, ITreeConfig } from "./typings";
 import { RefreshQueue } from "./utils";
+import d3 from "./d3";
 
 export function create(userSettings: Partial<ITreeConfig>) {
   const defaultSettings: ITreeConfig = {
@@ -102,12 +103,29 @@ export function create(userSettings: Partial<ITreeConfig>) {
       if (newSettings) {
         settings = { ...settings, ...newSettings };
       }
-      const nestedData = generateNestedData(data, settings);
+      // Create an invisible root so that we support multiple 
+      let mutatedData: any = JSON.parse(JSON.stringify(data));
+      mutatedData = mutatedData.map((i: any) => {i[settings.relationnalField] = i[settings.relationnalField] === null ? 'root' : i[settings.relationnalField]; return i});
+      let root: any = {label: 'Root'};
+      root[settings.idKey] = 'root';
+      root[settings.relationnalField] = null;
+      mutatedData.unshift(root);
+      // end invisible root
+      const nestedData = generateNestedData(mutatedData, settings);
       const treemap = generateBasicTreemap(settings);
       const computedTree = treemap(nestedData); // mutation
 
       // @ts-ignore
       draw(svg, computedTree);
+
+      // Remove root node
+      svg.selectAll("g.node").each(function(d: any) {
+        if (!d.parent) { d3.select(this).remove(); }
+      });
+      // Remove root link
+      svg.selectAll("path.link").each(function(d: any) {
+        if (!d.parent.parent) { d3.select(this).remove(); }
+      });
     });
   }
 
@@ -123,8 +141,9 @@ export function create(userSettings: Partial<ITreeConfig>) {
     oldNodes = [];
   }
 
-  const treeObject = { refresh, clean };
-
   const svg = initiliazeSVG(settings);
+
+  const treeObject = { refresh, clean, svg };
+  
   return treeObject;
 }

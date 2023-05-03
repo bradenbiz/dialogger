@@ -61,7 +61,8 @@ let data: NodeData[] = [
     { id: 2, label: "Chicken", type: NodeType.idea, parent: 1 },
     { id: 3, label: "Egg", type: NodeType.decision, parent: 1 },
     { id: 4, label: "Chickens hatch from them", type: NodeType.positive, parent: 3 },
-    { id: 5, label: "Impossible", type: NodeType.negative, parent: 3 }
+    { id: 5, label: "Impossible", type: NodeType.negative, parent: 3 },
+    { id: 6, label: "Chicken or egg first?", type: NodeType.question, parent: null },
 ];
 
 // Define and configure a tree object
@@ -81,12 +82,7 @@ var myTree = Treeviz.create({
     linkColor: () => "#B0BEC5",
     onNodeClick: (event: PointerEvent, node: any) => {
         if ((event.target as Element).classList.contains('add')) {
-            const id = new Date().getTime()
-            data.push({ id, label: "", type: NodeType.idea, parent: node.data.id });
-            myTree.refresh(data);   
-            const input = document.getElementById(id.toString())?.querySelector('input');
-            input?.focus();
-            input?.addEventListener("blur", () => onBlur(input) );
+            add(node.data.id);
         }
         if ((event.target as Element).classList.contains('delete')) {
             const toDelete = [node.data.id].concat(node.children?.map((i: ExtendedHierarchyPointNode) => (i.data as NodeData).id) || []);
@@ -104,19 +100,19 @@ var myTree = Treeviz.create({
         
     },
     renderNode: (node) => {
-        console.log(node);
+        console.log('render node', node);
         return `
-            <div id="${node.data.id}" class="node flex items-center ${getColor(node.data.type)} border-white border-2 rounded-lg p-2 relative" style="width:  ${node.settings.nodeWidth}px; height: ${node.settings.nodeHeight}px;">
+            <div id="${node.data.id}" class="node flex items-center ${getColor(node.data.type)} border-2 rounded-lg p-2 relative" style="width:  ${node.settings.nodeWidth}px; height: ${node.settings.nodeHeight}px;">
                 <i class="${getIcon(node.data.type)} text-3xl mr-2 text-black/40"></i>
                 <input data-id="${node.data.id}" type="text" class="bg-transparent" value="${node.data.label}">
                 <i class="add fas fa-plus text-sm hidden cursor-pointer absolute -right-3 -top-3 bg-green-600 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-green-700"></i>
-                <i class="delete fas fa-trash text-xs ${node.data.parent ? 'hidden' : '!hidden'} cursor-pointer absolute -right-3 -bottom-3 bg-red-400 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-red-500"></i>
+                <i class="delete fas fa-trash text-xs hidden cursor-pointer absolute -right-3 -bottom-3 bg-red-400 w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:bg-red-500"></i>
                 
-                <i data-type="${NodeType.question}" class="changeType ${getIcon(NodeType.question)} ${getColor(NodeType.question)} text-xs hidden cursor-pointer absolute -left-3 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.idea}" class="changeType ${getIcon(NodeType.idea)} ${getColor(NodeType.idea)} text-xs hidden cursor-pointer absolute left-4 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.decision}" class="changeType ${getIcon(NodeType.decision)} ${getColor(NodeType.decision)} text-xs hidden cursor-pointer absolute left-12 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.positive}" class="changeType ${getIcon(NodeType.positive)} ${getColor(NodeType.positive)} text-xs hidden cursor-pointer absolute left-20 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
-                <i data-type="${NodeType.negative}" class="changeType ${getIcon(NodeType.negative)} ${getColor(NodeType.negative)} text-xs hidden cursor-pointer absolute left-28 -bottom-3  w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.question}" class="changeType ${getIcon(NodeType.question)} ${getColor(NodeType.question)} text-xs hidden cursor-pointer absolute -left-3 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.idea}" class="changeType ${getIcon(NodeType.idea)} ${getColor(NodeType.idea)} text-xs hidden cursor-pointer absolute left-4 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.decision}" class="changeType ${getIcon(NodeType.decision)} ${getColor(NodeType.decision)} text-xs hidden cursor-pointer absolute left-12 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.positive}" class="changeType ${getIcon(NodeType.positive)} ${getColor(NodeType.positive)} text-xs hidden cursor-pointer absolute left-20 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
+                <i data-type="${NodeType.negative}" class="changeType ${getIcon(NodeType.negative)} ${getColor(NodeType.negative)} text-xs hidden cursor-pointer absolute left-28 -bottom-3 border w-6 h-6 items-center justify-center rounded-full text-white font-bold"></i>
             </div>
         `;
     },
@@ -184,6 +180,17 @@ Array.from(document.querySelectorAll('input')).forEach((el) => {
     console.log('an el is', el)
     el.addEventListener("blur", () => onBlur(el) );
 });
+
+const add = (parent: number | null = null) => {
+    const id = new Date().getTime();
+    data.push({ id, label: "", type: NodeType.question, parent });
+    myTree.refresh(data);   
+    const input = document.getElementById(id.toString())?.querySelector('input');
+    input?.focus();
+    input?.addEventListener("blur", () => onBlur(input) );
+}
+
+document.getElementById('add')?.addEventListener('click', () => add());
 
 document.getElementById('zoomIn')?.addEventListener('click', () => scrollTo(null, null, currTransform.z += 0.1));
 document.getElementById('zoomOut')?.addEventListener('click', () => scrollTo(null, null, currTransform.z += -0.1));
