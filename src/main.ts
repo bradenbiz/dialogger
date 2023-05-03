@@ -71,8 +71,8 @@ let data: NodeData[] = [
     { id: 8, label: "Ford", type: NodeType.idea, parent: 6 },
     { id: 9, label: "Mini Cooper", type: NodeType.idea, parent: 6 },
     { id: 10, label: "Rare", type: NodeType.con, parent: 9 },
-    { id: 10, label: "Reliability", type: NodeType.pro, parent: 7 },
-    { id: 11, label: "Import costs", type: NodeType.con, parent: 7 },
+    { id: 11, label: "Reliability", type: NodeType.pro, parent: 7 },
+    { id: 12, label: "Import costs", type: NodeType.con, parent: 7 },
 ];
 
 // Define and configure a tree object
