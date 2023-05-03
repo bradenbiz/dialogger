@@ -12,7 +12,12 @@
   "author": "Plaza Software",
   "license": "MIT",
   "dependencies": {
+    "graphology": "^0.25.1",
+    "sigma": "^3.0.0-alpha3",
     "typescript": "^5.0.4",
     "vite": "^4.3.3"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^7.6.0"
   }
 }
