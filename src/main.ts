@@ -97,6 +97,7 @@ const addQuestion = (text: string): void => { console.log(text) };
 
 addQuestion("blah");
 
+//@ts-ignore
 graph.addNode("John", { x: 0, y: 10, size: 5, label: "John", color: "blue" });
 // graph.addEdge("John", "Mary");s
 
