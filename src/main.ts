@@ -176,5 +176,5 @@ nodeData.forEach((aNode) => {
 
 // #endregion
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const renderer = new Sigma(graph, container);
+console.log(renderer);
