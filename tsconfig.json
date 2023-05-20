@@ -7,8 +7,7 @@
       "skipLibCheck": true,
   
       /* Bundler mode */
-      "moduleResolution": "bundler",
-      "allowImportingTsExtensions": true,
+      "moduleResolution": "node",
       "resolveJsonModule": true,
       "isolatedModules": true,
       "noEmit": true,
@@ -17,7 +16,10 @@
       "strict": true,
       "noUnusedLocals": true,
       "noUnusedParameters": true,
-      "noFallthroughCasesInSwitch": true
+      "noFallthroughCasesInSwitch": true,
+      "paths": {
+        "treeviz": ["./src/libs/treeviz"]
+      }
     },
     "include": ["src"]
   }

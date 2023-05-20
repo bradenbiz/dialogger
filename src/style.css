@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body, html { margin: 0; overflow: hidden; }
+body, html, body * { box-sizing: border-box; }
+#tree { width: 100vw; height: 100vh;}
+
+.node:hover .add,
+.node:hover .changeType,
+.node:hover .delete {
+    display: flex;
+}
