@@ -2,13 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <title>Dialogger</title>
   </head>
   <body>
-    <div id="app">
-        Working!
+    <header class="fixed top-0 left-0 w-full backdrop-blur bg-white/50 flex justify-between p-4">
+        <div>
+            <i class="fas fa-share-nodes"></i>
+        </div>
+        <div>
+            <b>Example Diagram</b>
+        </div>
+        <div>
+            <i class="fas fa-cog"></i>
+        </div>
+    </header>
+    <div id="tree"></div>
+    <div class="fixed bottom-4 left-4 flex gap-4">
+      <button id="add" class="hover:opacity-80">
+        <i class="fas fa-plus"></i>
+      </button>
+    </div>
+    <div id="zoom" class="fixed bottom-4 right-4 flex gap-4">
+      <!-- <button id="zoomIn" class="bg-black hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">
+        <i class="fas fa-plus"></i>
+      </button>
+      <button id="zoomOut" class="bg-black hover:bg-gray-600 text-white w-10 h-10 rounded text-2xl flex items-center justify-center">
+        <i class="fas fa-minus"></i>
+      </button> -->
+      <button id="fullscreen" class="hover:opacity-80">
+        <i class="fas fa-expand"></i>
+      </button>
+      <button id="unfullscreen" class="hidden hover:opacity-80">
+        <i class="fas fa-compress"></i>
+      </button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
