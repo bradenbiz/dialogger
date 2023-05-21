@@ -1,6 +1,6 @@
-import ViewCounter from "@/components/ViewCounter";
 import { Suspense } from "react";
 import { Fullscreen, Tree } from "../components";
+import { ViewCounter } from "../components/ViewCounter";
 
 export default function Home() {
   return (
