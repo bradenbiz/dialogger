@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -33,7 +33,6 @@
   },
   "devDependencies": {
     "@types/ms": "^0.7.31",
-    "autoprefixer": "^10.4.14",
-    "turbo": "^1.9.3"
+    "autoprefixer": "^10.4.14"
   }
 }
