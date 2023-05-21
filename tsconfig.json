@@ -1,26 +1,43 @@
 {
-    "compilerOptions": {
-      "target": "ES2020",
-      "useDefineForClassFields": true,
-      "module": "ESNext",
-      "lib": ["ES2020", "DOM", "DOM.Iterable"],
-      "skipLibCheck": true,
-  
-      /* Bundler mode */
-      "moduleResolution": "node",
-      "resolveJsonModule": true,
-      "isolatedModules": true,
-      "noEmit": true,
-  
-      /* Linting */
-      "strict": true,
-      "noUnusedLocals": true,
-      "noUnusedParameters": true,
-      "noFallthroughCasesInSwitch": true,
-      "paths": {
-        "treeviz": ["./src/libs/treeviz"]
+  "compilerOptions": {
+    // "target": "es5",
+    // "lib": ["dom", "dom.iterable", "esnext"],
+
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
       }
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "treeviz": ["./src/libs/treeviz"]
     },
-    "include": ["src"]
-  }
-  
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "useDefineForClassFields": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "lib/seed.ts",
+    "src"
+  ],
+  "exclude": ["node_modules"]
+}
