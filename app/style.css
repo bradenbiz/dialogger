@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.node .add,
+.node .changeType,
+.node .delete {
+  display: none;
+}
+
+.node:hover .add,
+.node:hover .changeType,
+.node:hover .delete {
+  display: flex;
+  cursor: pointer;
+}
