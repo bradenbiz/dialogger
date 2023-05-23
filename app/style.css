@@ -2,15 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-.node .add,
-.node .changeType,
-.node .delete {
+.node .btn {
   display: none;
 }
 
-.node:hover .add,
-.node:hover .changeType,
-.node:hover .delete {
+.node:hover .btn {
   display: flex;
   cursor: pointer;
 }
