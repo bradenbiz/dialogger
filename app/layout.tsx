@@ -1,12 +1,12 @@
-import { Inter } from "next/font/google";
+import { Jost } from "next/font/google";
 
 export const metadata = {
-  title: "Dialogger",
-  description: "Bringing consensus to your conversations",
+  title: "Twiglog",
+  description: "Clear-cut conversations",
 };
 
-const inter = Inter({
-  variable: "--font-inter",
+const jost = Jost({
+  variable: "--font-jost",
   subsets: ["latin"],
   display: "swap",
 });
@@ -27,7 +27,7 @@ export default function RootLayout({
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
         />
       </head>
-      <body className={inter.variable}>{children}</body>
+      <body className={jost.variable}>{children}</body>
     </html>
   );
 }
