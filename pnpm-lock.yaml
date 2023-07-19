@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 dependencies:
   '@types/d3-hierarchy':
     specifier: ^2.0.0
@@ -28,6 +32,9 @@ dependencies:
   d3-hierarchy:
     specifier: ^2.0.0
     version: 2.0.0
+  d3-save-svg:
+    specifier: ^0.0.2
+    version: 0.0.2
   d3-selection:
     specifier: ^2.0.0
     version: 2.0.0
@@ -763,6 +770,10 @@ packages:
     resolution: {integrity: sha512-c5UhwwTs/yybcmTpAVqwSFl6vrQ8JZJoT5F7xNFK9pymv5C0Ymcc9/LIJHtYIggg/yS9YHw8i8O8tgb9pupjeQ==}
     dependencies:
       d3-color: 2.0.0
+    dev: false
+
+  /d3-save-svg@0.0.2:
+    resolution: {integrity: sha512-VFAdWUd/IVzIIyV3sNPi8l8xk0a8V/NUz0SpdGXsjpQ6YU3GP0Kh7hatr3Lp6xtPQZezife0Mxiss8PjcDFo4g==}
     dev: false
 
   /d3-selection@2.0.0:
