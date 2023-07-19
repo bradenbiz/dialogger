@@ -19,6 +19,7 @@
     "@vercel/kv": "0.2.1",
     "autoprefixer": "10.4.14",
     "d3-hierarchy": "^2.0.0",
+    "d3-save-svg": "^0.0.2",
     "d3-selection": "^2.0.0",
     "d3-zoom": "^2.0.0",
     "eslint": "8.38.0",
