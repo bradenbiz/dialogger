@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import ReactDOMServer from "react-dom/server";
 import * as Treeviz from "treeviz";
-import "../../app/style.css";
-import { ExtendedHierarchyPointNode } from "../../src/libs/treeviz/typings";
+import "../../../app/style.css";
+import { ExtendedHierarchyPointNode } from "../../../src/libs/treeviz/typings";
 import { mockData } from "./mock/data";
 import { ButtonProps, NodeData, NodeType } from "./types";
 import { getColor, getIcon, toProperCase } from "./utils";
-import ReactDOMServer from 'react-dom/server';
 
 export const Tree = () => {
   useEffect(() => {
@@ -34,10 +34,10 @@ export const Tree = () => {
         if ((event.target as Element).classList.contains("btn")) {
           const type = (event.target as Element).getAttribute("data-type");
           switch (type) {
-            case 'add':
+            case "add":
               data = add(myTree, data, node.data.id);
               break;
-            case 'delete':
+            case "delete":
               const toDelete = [node.data.id].concat(
                 node.children?.map(
                   (i: ExtendedHierarchyPointNode) => (i.data as NodeData).id
@@ -57,70 +57,78 @@ export const Tree = () => {
                 removeInputListeners(data);
                 addInputListeners(data);
               }, 500);
-              break; 
+              break;
           }
         }
       },
       renderNode: (node) => {
-        const nodeClasses = `node flex items-center ${getColor(node.data.type)} border-2 rounded-lg p-2 relative w-[${node.settings.nodeWidth}px] h-[${node.settings.nodeHeight}px]`;
+        const nodeClasses = `node flex items-center ${getColor(
+          node.data.type
+        )} border-2 rounded-lg p-2 relative w-[${
+          node.settings.nodeWidth
+        }px] h-[${node.settings.nodeHeight}px]`;
         return ReactDOMServer.renderToStaticMarkup(
           <div id={node.data.id} className={nodeClasses}>
-            <i className={`${getIcon(node.data.type)} text-3xl mr-2 text-black/40`}></i>
-            <input 
-              data-id={node.data.id} 
-              type="text" 
-              placeholder={`New ${toProperCase(NodeType[node.data.type])}`} 
-              className="bg-transparent placeholder-black/30" 
-              value={node.data.label} 
+            <i
+              className={`${getIcon(
+                node.data.type
+              )} text-3xl mr-2 text-black/40`}
+            ></i>
+            <input
+              data-id={node.data.id}
+              type="text"
+              placeholder={`New ${toProperCase(NodeType[node.data.type])}`}
+              className="bg-transparent placeholder-black/30"
+              value={node.data.label}
             />
-            <Button 
-              id="add" 
-              icon="fas fa-plus" 
-              color="bg-green-600" 
-              hoverColor="bg-green-700" 
-              pos="-right-3 -top-3" 
+            <Button
+              id="add"
+              icon="fas fa-plus"
+              color="bg-green-600"
+              hoverColor="bg-green-700"
+              pos="-right-3 -top-3"
             />
-            <Button 
-              id="delete" 
-              icon="fas fa-trash" 
-              color="bg-red-400" 
-              hoverColor="bg-red-500" 
-              pos="-right-3 -bottom-3" 
+            <Button
+              id="delete"
+              icon="fas fa-trash"
+              color="bg-red-400"
+              hoverColor="bg-red-500"
+              pos="-right-3 -bottom-3"
             />
-            <Button 
-              id={NodeType.question} 
-              icon={getIcon(NodeType.question)} 
-              color={getColor(NodeType.question)} 
-              hoverColor="" 
-              pos="-left-3 -bottom-3" 
+            <Button
+              id={NodeType.question}
+              icon={getIcon(NodeType.question)}
+              color={getColor(NodeType.question)}
+              hoverColor=""
+              pos="-left-3 -bottom-3"
             />
-            <Button 
-              id={NodeType.idea} 
-              icon={getIcon(NodeType.idea)} 
-              color={getColor(NodeType.idea)} 
-              hoverColor="" 
-              pos="left-4 -bottom-3" 
+            <Button
+              id={NodeType.idea}
+              icon={getIcon(NodeType.idea)}
+              color={getColor(NodeType.idea)}
+              hoverColor=""
+              pos="left-4 -bottom-3"
             />
-            <Button 
-              id={NodeType.decision} 
-              icon={getIcon(NodeType.decision)} 
-              color={getColor(NodeType.decision)} 
-              hoverColor="" 
-              pos="left-12 -bottom-3" 
+            <Button
+              id={NodeType.decision}
+              icon={getIcon(NodeType.decision)}
+              color={getColor(NodeType.decision)}
+              hoverColor=""
+              pos="left-12 -bottom-3"
             />
-            <Button 
-              id={NodeType.pro} 
-              icon={getIcon(NodeType.pro)} 
-              color={getColor(NodeType.pro)} 
-              hoverColor="" 
-              pos="left-20 -bottom-3" 
+            <Button
+              id={NodeType.pro}
+              icon={getIcon(NodeType.pro)}
+              color={getColor(NodeType.pro)}
+              hoverColor=""
+              pos="left-20 -bottom-3"
             />
-            <Button 
-              id={NodeType.con} 
-              icon={getIcon(NodeType.con)} 
-              color={getColor(NodeType.con)} 
-              hoverColor="" 
-              pos="left-28 -bottom-3" 
+            <Button
+              id={NodeType.con}
+              icon={getIcon(NodeType.con)}
+              color={getColor(NodeType.con)}
+              hoverColor=""
+              pos="left-28 -bottom-3"
             />
           </div>
         );
@@ -137,8 +145,11 @@ export const Tree = () => {
   return <div id="tree" className="w-screen h-screen"></div>;
 };
 
-const Button = ({id, icon, color, hoverColor, pos}: ButtonProps) => (
-  <i data-type={id} className={`${icon} btn text-sm hidden cursor-pointer absolute ${pos} ${color} w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:${hoverColor}`}></i>
+const Button = ({ id, icon, color, hoverColor, pos }: ButtonProps) => (
+  <i
+    data-type={id}
+    className={`${icon} btn text-sm hidden cursor-pointer absolute ${pos} ${color} w-6 h-6 items-center justify-center rounded-full text-white font-bold hover:${hoverColor}`}
+  ></i>
 );
 
 // #region helper functions
