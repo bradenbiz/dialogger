@@ -12,7 +12,7 @@ export default function Home() {
           <div className="flex flex-row justify-center items-center">
             <Image
               src="/twig.png"
-              alt="Dialogger title"
+              alt="Twiglog title"
               className="xl:w-1/2 md:w-2/3 sm:w-9/12 w-10/12"
               width={500}
               height={500}
