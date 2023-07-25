@@ -1,21 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import ReactDOMServer from "react-dom/server";
 import * as Treeviz from "treeviz";
 import "../../../app/style.css";
 import { ExtendedHierarchyPointNode } from "../../../src/libs/treeviz/typings";
-import { mockData } from "./mock/data";
 import { ButtonProps, NodeData, NodeType } from "./types";
 import { getColor, getIcon, toProperCase } from "./utils";
 
-export const Tree = () => {
+export const Tree = ({nodes, setNodes}: {nodes: NodeData[], setNodes: Dispatch<SetStateAction<NodeData[]>>}) => {
+  const [tree, setTree] = useState<any>(null);
   useEffect(() => {
-    // let currTransform: Transform = { z: 1, x: 0, y: 0 };
-
-    let data = mockData;
-
-    // Define and configure a tree object
     let myTree = Treeviz.create({
       htmlId: "tree",
       idKey: "id",
@@ -31,6 +26,7 @@ export const Tree = () => {
       linkShape: "quadraticBeziers",
       linkColor: () => "#B0BEC5",
       onNodeClick: (event: PointerEvent, node: any) => {
+        let data: any[] = [];
         if ((event.target as Element).classList.contains("btn")) {
           const type = (event.target as Element).getAttribute("data-type");
           switch (type) {
@@ -135,12 +131,17 @@ export const Tree = () => {
       },
       relationnalField: "parent",
     });
-
-    // Display the tree based on the data
-    myTree.refresh(data);
-
-    addInputListeners(data);
+    setTree(myTree);
   }, []);
+
+  useEffect(() => {
+    console.log('TREE?', tree);
+    if (!tree) { return }
+    console.log('NEW NODES', nodes);
+    tree.refresh(nodes);
+    removeInputListeners(nodes);
+    addInputListeners(nodes);
+  }, [tree, nodes])
 
   return <div id="tree" className="w-screen h-screen"></div>;
 };

@@ -15,7 +15,7 @@ export const Fullscreen = () => {
   };
 
   return (
-    <div id="screen" className="fixed bottom-4 left-4">
+    <div id="screen" className="fixed bottom-4 right-4">
       {!fullscreen && (
         <button
           onClick={toggleFullscreen}
