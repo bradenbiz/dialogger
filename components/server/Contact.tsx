@@ -22,7 +22,7 @@ export const Contact = () => {
         <div>
           What do you like / dislike? Email me at{" "}
           <span className="underline hover:cursor-pointer" onClick={copyEmail}>
-            nbsp@hey.com
+            bispingbraden@gmail.com
           </span>
           !
         </div>
