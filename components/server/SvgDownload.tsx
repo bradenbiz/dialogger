@@ -3,7 +3,7 @@ var d3SaveSvg = require("d3-save-svg");
 export const SvgDownload = () => {
   const downloadSVG = () => {
     var config = {
-      filename: "twiglog_" + new Date().toLocaleDateString(),
+      filename: "dialogger_" + new Date().toLocaleDateString(),
     };
     d3SaveSvg.save(
       document.getElementById("tree")?.querySelector("svg"),
