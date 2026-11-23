@@ -1,7 +1,7 @@
 import { Jost } from "next/font/google";
 
 export const metadata = {
-  title: "Twiglog",
+  title: "Dialogger",
   description: "Clear-cut conversations",
 };
 

@@ -12,13 +12,13 @@ export default function Home() {
           <div className="flex flex-row justify-center items-center">
             <Image
               src="/twig.png"
-              alt="Twiglog title"
+              alt="Dialogger title"
               className="xl:w-1/2 md:w-2/3 sm:w-9/12 w-10/12"
               width={500}
               height={500}
               priority
             />
-            <h1 className="text-9xl">Twiglog</h1>
+            <h1 className="text-9xl">Dialogger</h1>
           </div>
           <p className="text-xl">for clear-cut conversations </p>
         </div>

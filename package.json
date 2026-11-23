@@ -1,6 +1,6 @@
 {
-  "name": "twiglog",
-  "repository": "https://github.com/plazasoftware/twiglog",
+  "name": "dialogger",
+  "repository": "https://github.com/plazasoftware/dialogger",
   "version": "0.0.0",
   "private": true,
   "scripts": {
