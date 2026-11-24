@@ -24,8 +24,11 @@ import {
   type FacilitationLens,
 } from "@/components/ConklinMetrics";
 import { HostContextBar } from "@/components/HostContextBar";
-import { TranscriptPanel } from "@/components/TranscriptPanel";
-import { DialogueMapCanvas } from "@/components/DialogueMapCanvas";
+import { TranscriptPanel, TranscriptPanelSkeleton } from "@/components/TranscriptPanel";
+import {
+  DialogueMapCanvas,
+  DialogueMapCanvasPlaceholder,
+} from "@/components/DialogueMapCanvas";
 import { NodeInspector } from "@/components/NodeInspector";
 import { AgentModal, SettingsModal, YouTubeModal } from "@/components/panels";
 import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
@@ -37,9 +40,11 @@ export function App() {
   // writes into it (applySessionEvent), so `session` is always the cached copy.
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const sessionsQuery = useSessionsQuery();
-  const sessions = sessionsQuery.data ?? [];
+  const sessions = sessionsQuery.data;
   const sessionQuery = useSessionQuery(activeSessionId);
-  const session = sessionQuery.data ?? null;
+  const session = sessionQuery.data;
+  // The previous session, still shown while the newly selected one loads
+  const isSwitching = sessionQuery.isPlaceholderData;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(
     new Set()
@@ -125,7 +130,7 @@ export function App() {
   // Back/Forward (or an edited URL) changed ?session=: open that session.
   useEffect(() => {
     if (!activeSessionId || !url.session || url.session === activeSessionId) return;
-    if (sessions.some((s) => s.id === url.session)) setActiveSessionId(url.session);
+    if (sessions?.some((s) => s.id === url.session)) setActiveSessionId(url.session);
     // Unknown id: point the URL back at the session that's open
     else setUrl({ session: activeSessionId }, { replace: true });
   }, [url.session]);
@@ -181,9 +186,7 @@ export function App() {
 
   const stats = useMemo(
     () =>
-      session
-        ? computeConklinStats(session.nodes, session.turns)
-        : computeConklinStats([], []),
+      session ? computeConklinStats(session.nodes, session.turns) : undefined,
     [session]
   );
 
@@ -501,16 +504,13 @@ export function App() {
     );
   }
 
-  if (!session) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#FAF9F6] text-stone-500 text-sm">
-        Loading Dialogger…
-      </div>
-    );
-  }
-
   return (
-    <div className="w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6]">
+    <div
+      className={`w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6] transition-opacity ${
+        isSwitching ? "opacity-60 pointer-events-none" : ""
+      }`}
+      aria-busy={isSwitching}
+    >
       {/* Hidden input for empty-state upload CTA */}
       <input
         ref={uploadInputRef}
@@ -537,13 +537,15 @@ export function App() {
         onSelectSession={(id) => void handleSelectSession(id)}
         onCreateSession={() => void handleCreateSession()}
         onDeleteSession={(id) => void handleDeleteSession(id)}
-        onRenameSession={(title) =>
-          void api.updateSession(session.id, { title })
-        }
+        onRenameSession={(title) => {
+          if (session) void api.updateSession(session.id, { title });
+        }}
         onToggleMic={() => void handleToggleMic()}
         onUploadAudio={(f) => void handleUploadAudio(f)}
         onOpenYouTubeModal={() => openPanel("youtube")}
-        onStopTranscribing={() => void api.stopTranscription(session.id)}
+        onStopTranscribing={() => {
+          if (session) void api.stopTranscription(session.id);
+        }}
         onToggleDemo={() => void handleToggleDemo()}
         onOpenAgentModal={() => openPanel("agent")}
         onOpenSettings={() => openPanel("settings")}
@@ -563,128 +565,141 @@ export function App() {
       />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        <TranscriptPanel
-          session={session}
-          partialText={partialText}
-          highlightedTurnIds={highlightedTurnIds}
-          playingTurnId={playingTurnId}
-          seekRequest={seekRequest}
-          activeSpeakerFilter={activeSpeakerFilter}
-          mapperBusy={mapperBusy}
-          isTranscribing={isTranscribing}
-          onAudioTimeUpdate={handleAudioTimeUpdate}
-          onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
-          onTrimAudio={async (params) => {
-            try {
-              const { session: updated } = await api.trimSessionAudio(
-                session.id,
-                params
-              );
-              cacheSession(updated);
-              setSelectedNodeId(null);
-              setHighlightedNodeIds(new Set());
-              await invalidateSessions();
-            } catch (err) {
-              showError(err instanceof Error ? err.message : String(err));
+        {session ? (
+          <TranscriptPanel
+            session={session}
+            partialText={partialText}
+            highlightedTurnIds={highlightedTurnIds}
+            playingTurnId={playingTurnId}
+            seekRequest={seekRequest}
+            activeSpeakerFilter={activeSpeakerFilter}
+            mapperBusy={mapperBusy}
+            isTranscribing={isTranscribing}
+            onAudioTimeUpdate={handleAudioTimeUpdate}
+            onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
+            onTrimAudio={async (params) => {
+              try {
+                const { session: updated } = await api.trimSessionAudio(
+                  session.id,
+                  params
+                );
+                cacheSession(updated);
+                setSelectedNodeId(null);
+                setHighlightedNodeIds(new Set());
+                await invalidateSessions();
+              } catch (err) {
+                showError(err instanceof Error ? err.message : String(err));
+              }
+            }}
+            onStopTranscribing={() => void api.stopTranscription(session.id)}
+            onSelectTurn={handleSelectTurn}
+            onReassignTurnSpeaker={(turnId, patch) =>
+              void api.updateTurnSpeaker(session.id, turnId, patch)
             }
-          }}
-          onStopTranscribing={() => void api.stopTranscription(session.id)}
-          onSelectTurn={handleSelectTurn}
-          onReassignTurnSpeaker={(turnId, patch) =>
-            void api.updateTurnSpeaker(session.id, turnId, patch)
-          }
-          onFilterSpeaker={(spkId) => {
-            setActiveSpeakerFilter(spkId);
-            setHighlightedNodeIds(new Set());
-          }}
-          onRenameSpeaker={(spkId, name) =>
-            void api.renameSpeaker(session.id, spkId, name)
-          }
-          onSubmitManualTurn={async (speakerChannel, text) => {
-            await api.addTurn(
-              session.id,
-              { speakerChannel, text, source: "manual" },
-              session.autoMap
-            );
-          }}
-          onToggleAutoMap={(autoMap) =>
-            void api.updateSession(session.id, { autoMap })
-          }
-          onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
-          onDropAudioFile={(f) => void handleUploadAudio(f)}
-        />
+            onFilterSpeaker={(spkId) => {
+              setActiveSpeakerFilter(spkId);
+              setHighlightedNodeIds(new Set());
+            }}
+            onRenameSpeaker={(spkId, name) =>
+              void api.renameSpeaker(session.id, spkId, name)
+            }
+            onSubmitManualTurn={async (speakerChannel, text) => {
+              await api.addTurn(
+                session.id,
+                { speakerChannel, text, source: "manual" },
+                session.autoMap
+              );
+            }}
+            onToggleAutoMap={(autoMap) =>
+              void api.updateSession(session.id, { autoMap })
+            }
+            onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
+            onDropAudioFile={(f) => void handleUploadAudio(f)}
+          />
+        ) : (
+          <TranscriptPanelSkeleton />
+        )}
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           <HostContextBar
-            items={session.hostContext || []}
-            speakers={session.speakers}
-            onAddContext={(category: HostContextCategory, summary: string) =>
+            items={session?.hostContext}
+            speakers={session?.speakers}
+            onAddContext={(category: HostContextCategory, summary: string) => {
+              if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
                 summary: `Added session ${category.replace(/_/g, " ")} context`,
                 ops: [{ op: "add_host_context", category, summary }],
-              })
-            }
-            onRemoveContext={(id: string) =>
+              });
+            }}
+            onRemoveContext={(id: string) => {
+              if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
                 ops: [{ op: "remove_host_context", id }],
-              })
-            }
+              });
+            }}
             onFocusTurn={(turnId) => {
-              const turn = session.turns.find((t) => t.id === turnId);
+              const turn = session?.turns.find((t) => t.id === turnId);
               if (turn) handleSelectTurn(turn);
             }}
           />
 
-          <DialogueMapCanvas
-            session={session}
-            stats={stats}
-            lens={lens}
-            activeSpeakerFilter={activeSpeakerFilter}
-            selectedNodeId={selectedNodeId}
-            highlightedNodeIds={highlightedNodeIds}
-            recentNodeIds={recentNodeIds}
-            onSelectNode={(id) => {
-              setSelectedNodeId(id);
-              if (!id) setHighlightedNodeIds(new Set());
-            }}
-            onQuickAddChild={(parentId, type) =>
-              void handleQuickAddChild(parentId, type)
-            }
-            onStartDemo={() => void handleToggleDemo()}
-            onTriggerUpload={() => uploadInputRef.current?.click()}
-            onOpenYouTube={() => openPanel("youtube")}
-          />
+          {session && stats ? (
+            <DialogueMapCanvas
+              session={session}
+              stats={stats}
+              lens={lens}
+              activeSpeakerFilter={activeSpeakerFilter}
+              selectedNodeId={selectedNodeId}
+              highlightedNodeIds={highlightedNodeIds}
+              recentNodeIds={recentNodeIds}
+              onSelectNode={(id) => {
+                setSelectedNodeId(id);
+                if (!id) setHighlightedNodeIds(new Set());
+              }}
+              onQuickAddChild={(parentId, type) =>
+                void handleQuickAddChild(parentId, type)
+              }
+              onStartDemo={() => void handleToggleDemo()}
+              onTriggerUpload={() => uploadInputRef.current?.click()}
+              onOpenYouTube={() => openPanel("youtube")}
+            />
+          ) : (
+            <DialogueMapCanvasPlaceholder />
+          )}
         </div>
 
         <NodeInspector
           session={session}
           selectedNode={selectedNode}
           onClose={() => setSelectedNodeId(null)}
-          onUpdateNode={(id, patch) =>
+          onUpdateNode={(id, patch) => {
+            if (!session) return;
             void api.applyMapOps(session.id, {
               actor: "human",
               ops: [{ op: "update_node", id, ...patch }],
-            })
-          }
+            });
+          }}
           onDeleteNode={(id) => {
             setSelectedNodeId(null);
+            if (!session) return;
             void api.applyMapOps(session.id, {
               actor: "human",
               summary: "Removed node branch",
               ops: [{ op: "delete_node", id, cascade: true }],
             });
           }}
-          onAddChild={(parentId, type, label) =>
+          onAddChild={(parentId, type, label) => {
+            if (!session) return;
             void api.applyMapOps(session.id, {
               actor: "human",
               summary: `Added ${IBIS_NODE_META[type].shortName} node`,
               ops: [{ op: "add_node", parentId, type, label }],
-            })
-          }
+            });
+          }}
           onFocusTurn={(turnId) => {
-            const turn = session.turns.find((t) => t.id === turnId);
+            const turn = session?.turns.find((t) => t.id === turnId);
             if (turn) handleSelectTurn(turn);
           }}
           onSelectNode={(id) => setSelectedNodeId(id)}
@@ -707,11 +722,11 @@ export function App() {
 
       {/* Panels load on demand (see components/panels.tsx) */}
       <Suspense fallback={null}>
-        {url.panel === "agent" && (
+        {session && url.panel === "agent" && (
           <AgentModal session={session} onClose={closePanel} />
         )}
 
-        {url.panel === "settings" && (
+        {session && url.panel === "settings" && (
           <SettingsModal
             session={session}
             onClose={closePanel}
@@ -724,7 +739,7 @@ export function App() {
           />
         )}
 
-        {url.panel === "youtube" && (
+        {session && url.panel === "youtube" && (
           <YouTubeModal
             session={session}
             onClose={closePanel}

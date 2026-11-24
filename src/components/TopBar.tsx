@@ -15,13 +15,16 @@ import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
 import { preloadOnIntent } from "@/components/panels";
+import { Skeleton } from "@/components/Skeleton";
 
 /** The exporters only load when the user picks one from the Export menu. */
 const loadExport = () => import("@/lib/export");
 
 interface TopBarProps {
-  session: DialogueSession;
-  sessions: SessionSummary[];
+  /** The open session; undefined while it loads (title shows a skeleton, actions are disabled). */
+  session?: DialogueSession;
+  /** All sessions for the switcher; undefined while the list loads. */
+  sessions?: SessionSummary[];
   isListening: boolean;
   micLevel: number;
   isTranscribing: boolean;
@@ -67,16 +70,14 @@ export function TopBar({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(session.title);
+  const [titleDraft, setTitleDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const commitTitle = () => {
     setEditingTitle(false);
     const trimmed = titleDraft.trim();
-    if (trimmed && trimmed !== session.title) {
+    if (trimmed && session && trimmed !== session.title) {
       onRenameSession(trimmed);
-    } else {
-      setTitleDraft(session.title);
     }
   };
 
@@ -107,10 +108,7 @@ export function TopBar({
               onBlur={commitTitle}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitTitle();
-                if (e.key === "Escape") {
-                  setEditingTitle(false);
-                  setTitleDraft(session.title);
-                }
+                if (e.key === "Escape") setEditingTitle(false);
               }}
               className="text-sm font-medium text-stone-900 bg-stone-100 px-2 py-1 rounded-md border border-blue-400 outline-none w-64"
             />
@@ -118,6 +116,7 @@ export function TopBar({
             <button
               type="button"
               onDoubleClick={() => {
+                if (!session) return;
                 setTitleDraft(session.title);
                 setEditingTitle(true);
               }}
@@ -125,7 +124,11 @@ export function TopBar({
               title="Click to switch sessions · Double-click to rename"
               className="flex items-center gap-1.5 text-sm font-medium text-stone-800 hover:text-stone-950 hover:bg-stone-100 px-2 py-1 rounded-md transition truncate max-w-[260px]"
             >
-              <span className="truncate">{session.title}</span>
+              {session ? (
+                <span className="truncate">{session.title}</span>
+              ) : (
+                <Skeleton className="w-36 h-4" />
+              )}
               <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
             </button>
           )}
@@ -153,11 +156,18 @@ export function TopBar({
                   </button>
                 </div>
                 <div className="max-h-72 overflow-y-auto py-1">
-                  {sessions.map((s) => (
+                  {!sessions &&
+                    [0, 1, 2].map((i) => (
+                      <div key={i} className="px-3 py-2 space-y-1.5">
+                        <Skeleton className="block w-40 h-3.5" />
+                        <Skeleton className="block w-28 h-2.5" />
+                      </div>
+                    ))}
+                  {sessions?.map((s) => (
                     <div
                       key={s.id}
                       className={`group flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-stone-50 ${
-                        s.id === session.id ? "bg-blue-50/70 text-blue-900" : "text-stone-700"
+                        s.id === session?.id ? "bg-blue-50/70 text-blue-900" : "text-stone-700"
                       }`}
                       onClick={() => {
                         setSessionsOpen(false);
@@ -228,7 +238,8 @@ export function TopBar({
         <button
           type="button"
           onClick={onToggleMic}
-          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+          disabled={!session}
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition border disabled:opacity-50 ${
             isListening
               ? "bg-rose-600 text-white border-rose-700 shadow-sm hover:bg-rose-700"
               : "bg-stone-900 text-white border-stone-900 hover:bg-stone-800"
@@ -273,7 +284,7 @@ export function TopBar({
         />
         <button
           type="button"
-          disabled={isTranscribing}
+          disabled={!session || isTranscribing}
           onClick={() => fileInputRef.current?.click()}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition disabled:opacity-50"
           title="Transcribe & diarize a local audio file with Parakeet TDT v3 + Nemotron 3 Diarization"
@@ -291,7 +302,7 @@ export function TopBar({
         {/* YouTube URL Import */}
         <button
           type="button"
-          disabled={isTranscribing}
+          disabled={!session || isTranscribing}
           onClick={onOpenYouTubeModal}
           {...preloadOnIntent("youtube")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-800 transition disabled:opacity-50"
@@ -305,7 +316,8 @@ export function TopBar({
         <button
           type="button"
           onClick={onToggleDemo}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
+          disabled={!session}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition disabled:opacity-50 ${
             isDemoRunning
               ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
               : "bg-white border-stone-200 text-stone-700 hover:bg-stone-50"
@@ -329,8 +341,9 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenAgentModal}
+          disabled={!session}
           {...preloadOnIntent("agent")}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 transition"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 transition disabled:opacity-50"
           title="Connect an AI agent or model to drive this live Dialogue Map"
         >
           <Bot className="w-3.5 h-3.5" />
@@ -342,7 +355,8 @@ export function TopBar({
           <button
             type="button"
             onClick={() => setExportOpen((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 transition"
+            disabled={!session}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 transition disabled:opacity-50"
             title="Export Dialogue Map"
           >
             <Download className="w-3.5 h-3.5 text-stone-500" />
@@ -359,7 +373,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    void loadExport().then((m) => m.exportMapAsSvg(session));
+                    if (session) void loadExport().then((m) => m.exportMapAsSvg(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -369,7 +383,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    void loadExport().then((m) => m.exportMapAsMarkdown(session));
+                    if (session) void loadExport().then((m) => m.exportMapAsMarkdown(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -379,7 +393,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    void loadExport().then((m) => m.exportSessionAsJson(session));
+                    if (session) void loadExport().then((m) => m.exportSessionAsJson(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -394,8 +408,9 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenSettings}
+          disabled={!session}
           {...preloadOnIntent("settings")}
-          className="p-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition"
+          className="p-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition disabled:opacity-50"
           title="Speech models (Nemotron 3 / Parakeet) & Dialogue Mapper settings"
         >
           <Settings className="w-4 h-4" />

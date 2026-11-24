@@ -11,8 +11,9 @@ import type {
 } from "@shared/schemas/models";
 
 interface HostContextBarProps {
-  items: HostContextItem[];
-  speakers: Speaker[];
+  /** Undefined while the session loads: shows the empty bar with "Add Context" disabled. */
+  items?: HostContextItem[];
+  speakers?: Speaker[];
   onAddContext: (category: HostContextCategory, summary: string) => void;
   onRemoveContext: (id: string) => void;
   onFocusTurn: (turnId: string) => void;
@@ -74,10 +75,9 @@ export function HostContextBar({
   const [category, setCategory] = useState<HostContextCategory>("framing");
   const [draft, setDraft] = useState("");
 
-  const speakerMap = new Map(speakers.map((s) => [s.id, s]));
-
-  // When empty and not adding, show a subtle 1-line bar to add session-level context manually
-  if (items.length === 0 && !adding) {
+  // When empty (or still loading) and not adding, show a subtle 1-line bar to add
+  // session-level context manually
+  if (!items || !speakers || (items.length === 0 && !adding)) {
     return (
       <div className="border-b border-stone-200/70 bg-stone-50/70 px-4 py-1.5 flex items-center justify-between text-[11px] text-stone-500">
         <span className="inline-flex items-center gap-1.5">
@@ -90,13 +90,16 @@ export function HostContextBar({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-stone-200 text-stone-700 font-medium hover:bg-stone-100"
+          disabled={!items}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-stone-200 text-stone-700 font-medium hover:bg-stone-100 disabled:opacity-50"
         >
           <Plus className="w-3 h-3" /> Add Context
         </button>
       </div>
     );
   }
+
+  const speakerMap = new Map(speakers.map((s) => [s.id, s]));
 
   return (
     <div className="border-b border-stone-200/80 bg-violet-50/40 px-4 py-2 space-y-2 z-10">

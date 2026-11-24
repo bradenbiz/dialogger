@@ -32,6 +32,14 @@ interface DialogueMapCanvasProps {
   onOpenYouTube: () => void;
 }
 
+/**
+ * The map surface while its session loads: the empty dot grid, with no nodes and no
+ * get-started card (which would flash for a session that does have nodes).
+ */
+export function DialogueMapCanvasPlaceholder() {
+  return <div className="flex-1 relative overflow-hidden canvas-dot-grid" aria-busy="true" />;
+}
+
 export function DialogueMapCanvas({
   session,
   stats,

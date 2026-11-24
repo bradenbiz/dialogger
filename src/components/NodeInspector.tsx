@@ -15,9 +15,11 @@ import {
 } from "@shared/schemas/models";
 import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN } from "@shared/ibis";
 import { formatTime } from "@/lib/format";
+import { Skeleton } from "@/components/Skeleton";
 
 interface NodeInspectorProps {
-  session: DialogueSession;
+  /** Undefined while the session loads: the activity feed shows skeleton rows. */
+  session?: DialogueSession;
   selectedNode: IBISNode | null;
   onClose: () => void;
   onUpdateNode: (
@@ -63,15 +65,8 @@ export function NodeInspector({
     }
   }, [selectedNode?.id, selectedNode?.label, selectedNode?.detail, selectedNode?.type]);
 
-  const speakerMap = new Map<string, Speaker>(
-    session.speakers.map((s) => [s.id, s])
-  );
-  const turnMap = new Map<string, TranscriptTurn>(
-    session.turns.map((t) => [t.id, t])
-  );
-
   // When no node is selected, show a compact Conklin Live Activity & Grammar Drawer
-  if (!selectedNode) {
+  if (!selectedNode || !session) {
     return (
       <aside className="hidden 2xl:flex w-[310px] border-l border-stone-200/90 bg-white flex-col shrink-0">
         <div className="px-4 py-3 border-b border-stone-200/80 flex items-center gap-2">
@@ -82,7 +77,18 @@ export function NodeInspector({
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {session.activity.length === 0 ? (
+          {!session ? (
+            [0, 1, 2].map((i) => (
+              <div key={i} className="p-2.5 rounded-xl border border-stone-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="w-14 h-2.5" />
+                  <Skeleton className="w-12 h-2.5" />
+                </div>
+                <Skeleton className="block w-full h-3" />
+                <Skeleton className="block w-2/3 h-3" />
+              </div>
+            ))
+          ) : session.activity.length === 0 ? (
             <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/80 text-xs text-stone-600 space-y-2">
               <div className="flex items-center gap-1.5 font-semibold text-stone-800">
                 <BookOpen className="w-3.5 h-3.5 text-blue-600" />
@@ -152,6 +158,13 @@ export function NodeInspector({
       </aside>
     );
   }
+
+  const speakerMap = new Map<string, Speaker>(
+    session.speakers.map((s) => [s.id, s])
+  );
+  const turnMap = new Map<string, TranscriptTurn>(
+    session.turns.map((t) => [t.id, t])
+  );
 
   const meta = IBIS_NODE_META[selectedNode.type];
   const legalChildren = LEGAL_IBIS_CHILDREN[selectedNode.type];

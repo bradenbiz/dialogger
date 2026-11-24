@@ -17,6 +17,40 @@ import Volume2 from "lucide-react/icons/volume-2";
 import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
 import { formatTime } from "@/lib/format";
 import { AudioScrubber } from "./AudioScrubber";
+import { Skeleton } from "@/components/Skeleton";
+
+const PANEL_CLASS =
+  "w-[360px] xl:w-[400px] border-r border-stone-200/90 bg-white flex flex-col shrink-0 relative";
+
+/** The transcript panel while its session loads: the real header, with skeleton turns. */
+export function TranscriptPanelSkeleton() {
+  return (
+    <aside className={PANEL_CLASS} aria-busy="true">
+      <div className="px-4 py-3 border-b border-stone-200/80 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <AudioLines className="w-4 h-4 text-stone-500" />
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+            Diarized Transcript
+          </h2>
+          <Skeleton className="w-5 h-3" />
+        </div>
+        <Skeleton className="w-16 h-3" />
+      </div>
+      <div className="flex-1 p-3 space-y-3 overflow-hidden">
+        {["w-11/12", "w-2/3", "w-full", "w-3/5"].map((w, i) => (
+          <div key={i} className="rounded-xl border border-stone-100 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Skeleton className="w-20 h-3" />
+              <Skeleton className="w-10 h-3" />
+            </div>
+            <Skeleton className="block w-full h-3" />
+            <Skeleton className={`block ${w} h-3`} />
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
 
 interface TranscriptPanelProps {
   session: DialogueSession;
@@ -159,7 +193,7 @@ export function TranscriptPanel({
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`w-[360px] xl:w-[400px] border-r border-stone-200/90 bg-white flex flex-col shrink-0 relative transition ${
+      className={`${PANEL_CLASS} transition ${
         dragOver ? "ring-2 ring-inset ring-blue-500 bg-blue-50/30" : ""
       }`}
     >

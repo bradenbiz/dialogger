@@ -1,4 +1,4 @@
-import { QueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
+import { keepPreviousData, QueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSSEEvent } from "@shared/schemas/events";
 import { api, ApiError } from "@/lib/api";
@@ -36,6 +36,8 @@ export function useSessionsQuery() {
 /**
  * The open session. Its live SSE stream keeps this cache entry current (see
  * applySessionEvent), so it never goes stale on its own or refetches on focus.
+ * While switching to a session that isn't cached yet, the previous one stays as
+ * placeholder data (`isPlaceholderData`), so the screen doesn't drop back to a skeleton.
  */
 export function useSessionQuery(id: string | null) {
   return useQuery({
@@ -44,6 +46,7 @@ export function useSessionQuery(id: string | null) {
     enabled: Boolean(id),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 }
 
