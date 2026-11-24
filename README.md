@@ -73,7 +73,7 @@ pnpm start
 
 - Both `pnpm dev` and `pnpm start` serve on `http://127.0.0.1:4310`. Change it with `DIALOGGER_PORT`.
 - It binds to loopback by default. For network access, set `DIALOGGER_HOST=0.0.0.0` together with `DIALOGGER_API_KEY`.
-- Interactive API docs (Swagger UI): `http://127.0.0.1:4310/_swagger`. The raw OpenAPI spec is at `/_openapi.json`.
+- Interactive API docs (Swagger UI): `http://127.0.0.1:4310/_swagger`. The raw OpenAPI spec is at `/_openapi.json`. See [API Reference](#api-reference-swagger--openapi).
 
 ### 3. Optional LLM Dialogue Mapper (with 1Password)
 
@@ -82,6 +82,49 @@ Dialogger works **100% offline** out of the box with its deterministic Conklin h
 ```bash
 op run --env-file .env.1password -- pnpm start
 ```
+
+## API Reference (Swagger / OpenAPI)
+
+The server generates its API documentation automatically. Both `pnpm dev` and `pnpm start` serve it on the same port as the app:
+
+| What | Path | Default URL |
+|---|---|---|
+| Swagger UI (browse and try every endpoint) | `/_swagger` | http://127.0.0.1:4310/_swagger |
+| OpenAPI 3.1 spec (JSON, for agents and client generators) | `/_openapi.json` | http://127.0.0.1:4310/_openapi.json |
+
+If you change `DIALOGGER_PORT` or `DIALOGGER_HOST`, the URLs change with it.
+
+**What's documented:**
+- **Every endpoint**, grouped by area: Sessions, Transcript, Transcription, Audio, Map, YouTube, Speech, Voices, Mapper, Demo, Auth, Health, and Live.
+- **For each endpoint:** request body, success response, and error responses.
+- **Long-running transcription endpoints** (`/transcribe`, `/audio/transcribe`, `/youtube`) return either their result or `{ "cancelled": true }` if the job was stopped or replaced.
+- **The live event stream** (`GET /api/sessions/{id}/events`) is documented as `SessionEvent`, the set of JSON events it can send.
+- **The live-mic WebSocket** (`/ws/sessions/{id}/live`) is listed with its message protocol.
+
+**Errors.** Every non-2xx response is JSON in the form `{ "error": ... }`, where `error` is either:
+- a message string, or
+- for invalid request bodies, `{ "formErrors": [...], "fieldErrors": { "<field>": [...] } }`.
+
+**Using "Try it out" with an API key.** The Swagger page and the spec are always public. When `DIALOGGER_API_KEY` is set, the `/api` requests that Swagger sends need authentication:
+1. Open the Dialogger web UI in the same browser.
+2. Sign in there. That sets a session cookie.
+3. Use "Try it out" in Swagger; the cookie goes along with its requests.
+
+Outside the browser, send `Authorization: Bearer <key>`.
+
+**Where the docs come from.** The request and response shapes are Zod schemas in `shared/`:
+- [`shared/api.ts`](shared/api.ts): request and response bodies
+- [`shared/ibis.ts`](shared/ibis.ts): sessions, turns, speakers, map nodes, and map operations
+- [`shared/events.ts`](shared/events.ts): live-stream events and status types
+
+The server validates requests with these schemas, and the web client uses the same types. The Swagger definitions are generated from them when the spec is served, so the docs can't drift from what the server accepts.
+
+**Documenting a new endpoint:**
+1. Add the route file under `server/api/`.
+2. Define its body schemas in `shared/api.ts` and give each one a name with `named("MyThing", ...)`.
+3. In the route's `defineRouteMeta`, reference them as `#/components/schemas/MyThing`.
+
+`pnpm test` fails if a route references a schema name that doesn't exist.
 
 ## Driving Dialogger from an Agent or Model
 
