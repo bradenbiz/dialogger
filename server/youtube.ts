@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
@@ -41,6 +41,91 @@ export async function hasYtDlp(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** yt-dlp progress line for plain (non-section) downloads: bytes so far and total. */
+const YT_DLP_PROGRESS_TEMPLATE =
+  "download:DLPROG %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s";
+const DLPROG_RE = /DLPROG (\S+) (\S+) (\S+)/;
+/** ffmpeg status line emitted when yt-dlp downloads a --download-sections clip. */
+const FFMPEG_TIME_RE = /time=(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/;
+
+/**
+ * Parses one line of yt-dlp/ffmpeg output into a 0..1 download fraction.
+ * `clipLengthSec` is needed for section downloads, where ffmpeg only reports elapsed media time.
+ */
+export function parseDownloadProgress(
+  line: string,
+  clipLengthSec: number
+): number | null {
+  const dl = DLPROG_RE.exec(line);
+  if (dl) {
+    const done = Number(dl[1]);
+    const total = Number(dl[2]) || Number(dl[3]);
+    if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+      return Math.min(1, Math.max(0, done / total));
+    }
+    return null;
+  }
+  const t = FFMPEG_TIME_RE.exec(line);
+  if (t && clipLengthSec > 0) {
+    const sec = Number(t[1]) * 3600 + Number(t[2]) * 60 + Number(t[3]);
+    return Math.min(1, Math.max(0, sec / clipLengthSec));
+  }
+  return null;
+}
+
+/** Runs yt-dlp, streaming its stdout/stderr line by line (lines may end in \r or \n). */
+function runYtDlp(
+  args: string[],
+  options: { timeoutMs: number; signal?: AbortSignal; onLine?: (line: string) => void }
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("yt-dlp", args, {
+      signal: options.signal,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderrTail = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), options.timeoutMs);
+
+    const makeLineReader = (isStderr: boolean) => {
+      let buf = "";
+      return (chunk: Buffer) => {
+        const text = chunk.toString("utf8");
+        if (isStderr) stderrTail = (stderrTail + text).slice(-4000);
+        buf += text;
+        const parts = buf.split(/\r\n|\r|\n/);
+        buf = parts.pop() ?? "";
+        for (const part of parts) options.onLine?.(part);
+      };
+    };
+    child.stdout.on("data", makeLineReader(false));
+    child.stderr.on("data", makeLineReader(true));
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code, sig) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const errLines = stderrTail
+        .split(/\r|\n/)
+        .filter((l) => /ERROR/.test(l))
+        .join(" ")
+        .trim();
+      reject(
+        new Error(
+          `Command failed: yt-dlp ${args.join(" ")} ${
+            errLines || (sig ? `(killed by ${sig})` : `(exit code ${code})`)
+          }`
+        )
+      );
+    });
+  });
 }
 
 export async function fetchYouTubeMetadata(url: string): Promise<YouTubeMetadata> {
@@ -110,6 +195,8 @@ export async function downloadYouTubeAudio(
     startSec?: number;
     durationSec?: number;
     signal?: AbortSignal;
+    /** Called with the download fraction (0..1) as yt-dlp reports progress. */
+    onProgress?: (fraction: number) => void;
   }
 ): Promise<DownloadedYouTubeAudio> {
   const metadata = await fetchYouTubeMetadata(url);
@@ -145,6 +232,9 @@ export async function downloadYouTubeAudio(
       "bestaudio/best",
       "--no-playlist",
       "--no-warnings",
+      "--newline",
+      "--progress-template",
+      YT_DLP_PROGRESS_TEMPLATE,
       "-o",
       outTemplate,
     ];
@@ -154,10 +244,15 @@ export async function downloadYouTubeAudio(
     }
     args.push(metadata.webpageUrl);
 
-    await execFileAsync("yt-dlp", args, {
-      timeout: 300_000,
-      maxBuffer: 16 * 1024 * 1024,
+    const clipLengthSec =
+      useSection && clipEndSec > clipStartSec ? clipEndSec - clipStartSec : 0;
+    await runYtDlp(args, {
+      timeoutMs: 300_000,
       signal: options?.signal,
+      onLine: (line) => {
+        const fraction = parseDownloadProgress(line, clipLengthSec);
+        if (fraction !== null) options?.onProgress?.(fraction);
+      },
     });
 
     const files = fs

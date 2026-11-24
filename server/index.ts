@@ -1261,7 +1261,7 @@ app.post("/api/sessions/:id/youtube", async (req, res) => {
   sessionStore.broadcast(session.id, {
     type: "speech.status",
     state: "transcribing",
-    message: "Downloading public YouTube audio via yt-dlp…",
+    message: "Downloading YouTube audio… 0%",
   });
 
   let downloaded: Awaited<ReturnType<typeof downloadYouTubeAudio>> | null = null;
@@ -1270,15 +1270,32 @@ app.post("/api/sessions/:id/youtube", async (req, res) => {
     `${session.id}.staging-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.mp3`
   );
   try {
+    let lastDownloadPct = -1;
     downloaded = await downloadYouTubeAudio(url, {
       startSec,
       durationSec,
       signal: abortController.signal,
+      onProgress: (fraction) => {
+        if (!isCurrentJob(session.id, abortController)) return;
+        const pct = Math.floor(fraction * 100);
+        if (pct === lastDownloadPct) return;
+        lastDownloadPct = pct;
+        sessionStore.broadcast(session.id, {
+          type: "speech.status",
+          state: "transcribing",
+          message: `Downloading YouTube audio… ${pct}%`,
+        });
+      },
     });
     if (!isCurrentJob(session.id, abortController)) {
       res.json({ cancelled: true });
       return;
     }
+    sessionStore.broadcast(session.id, {
+      type: "speech.status",
+      state: "transcribing",
+      message: "Preparing downloaded audio…",
+    });
 
     // Encode seekable browser MP3 to a unique staging file BEFORE touching existing audio or session state (S3)
     const audioFilename = `${session.id}.mp3`;

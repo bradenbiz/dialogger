@@ -6,7 +6,7 @@ import { computeConklinStats, type IBISNode, type TranscriptTurn } from "../shar
 import { alignWordsToDiarization, wordsToDiarizedTurns } from "../server/speech";
 import { createDiarizationWindowContext, SessionStore } from "../server/store";
 import { DialogueMapperEngine } from "../server/mapper";
-import { isValidYouTubeUrl } from "../server/youtube";
+import { isValidYouTubeUrl, parseDownloadProgress } from "../server/youtube";
 
 let testDataDir: string;
 
@@ -530,5 +530,24 @@ describe("alignWordsToDiarization", () => {
     ];
     const aligned = alignWordsToDiarization(words, segments);
     expect(aligned.map((w) => w.speaker)).toEqual([1, 1, 2, 2]);
+  });
+});
+
+describe("YouTube download progress parsing", () => {
+  it("reads byte progress from the yt-dlp progress template", () => {
+    expect(parseDownloadProgress("DLPROG 4889046 19556184 NA", 0)).toBeCloseTo(0.25);
+    expect(parseDownloadProgress("DLPROG 500 NA 1000", 0)).toBeCloseTo(0.5);
+    expect(parseDownloadProgress("DLPROG 500 NA NA", 0)).toBeNull();
+  });
+
+  it("reads ffmpeg time= progress for clipped section downloads", () => {
+    const line = "size=     512KiB time=00:00:30.00 bitrate= 135.5kbits/s speed=1.71x";
+    expect(parseDownloadProgress(line, 60)).toBeCloseTo(0.5);
+    expect(parseDownloadProgress(line, 0)).toBeNull();
+    expect(parseDownloadProgress("size= 1KiB time=00:01:30.00", 60)).toBe(1);
+  });
+
+  it("ignores unrelated output", () => {
+    expect(parseDownloadProgress("[youtube] abc: Downloading webpage", 60)).toBeNull();
   });
 });
