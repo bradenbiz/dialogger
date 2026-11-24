@@ -7,6 +7,10 @@ import crypto from "node:crypto";
 
 const execFileAsync = promisify(execFile);
 
+// yt-dlp needs a JS runtime to solve YouTube's player challenges and only enables
+// Deno by default. Point it at the Node binary already running this server.
+const YT_DLP_JS_RUNTIME_ARGS = ["--js-runtimes", `node:${process.execPath}`];
+
 const YT_URL_RE =
   /^https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?|shorts\/|live\/|embed\/)|youtu\.be\/)/i;
 
@@ -48,6 +52,7 @@ export async function fetchYouTubeMetadata(url: string): Promise<YouTubeMetadata
     const { stdout } = await execFileAsync(
       "yt-dlp",
       [
+        ...YT_DLP_JS_RUNTIME_ARGS,
         "--dump-single-json",
         "--no-warnings",
         "--no-playlist",
@@ -135,6 +140,7 @@ export async function downloadYouTubeAudio(
 
   const runDownload = async (useSection: boolean): Promise<string> => {
     const args = [
+      ...YT_DLP_JS_RUNTIME_ARGS,
       "-f",
       "bestaudio/best",
       "--no-playlist",

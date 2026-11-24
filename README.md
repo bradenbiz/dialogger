@@ -39,7 +39,21 @@ nemo-speech pull parakeet-tdt
 nemo-speech pull nemotron-3.5
 ```
 
-`ffmpeg` is used to normalize uploaded `.mp3`, `.m4a`, `.webm`, `.ogg`, `.flac`, or `.mp4` files into 16 kHz mono PCM16 WAV before inference.
+`ffmpeg` (which includes `ffprobe`) is used to normalize uploaded `.mp3`, `.m4a`, `.webm`, `.ogg`, `.flac`, or `.mp4` files into 16 kHz mono PCM16 WAV before inference.
+
+**YouTube import** (optional) also needs [`yt-dlp`](https://github.com/yt-dlp/yt-dlp). It has to be a recent release (2025.11 or later), because those can use Node to solve YouTube's player challenges. Dialogger passes yt-dlp the Node binary the server runs on, so you don't need to install another JavaScript runtime.
+
+```bash
+# macOS
+brew install ffmpeg yt-dlp
+
+# Debian/Ubuntu
+sudo apt install ffmpeg && pipx install yt-dlp
+```
+
+These must be on the `PATH` of the process running the Dialogger server. Restart the server after installing them.
+
+> **Gotcha: `HTTP Error 403: Forbidden` means yt-dlp is out of date.** YouTube changes often, and a yt-dlp that is a few months old can still read video metadata but gets a 403 when it downloads the audio. Upgrade with `brew upgrade yt-dlp`, `pipx upgrade yt-dlp`, or `yt-dlp -U` (whichever matches how you installed it), then try again.
 
 ### 2. Run Dialogger
 
