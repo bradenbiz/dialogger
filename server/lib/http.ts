@@ -38,6 +38,51 @@ export async function parseBody<S extends z.ZodType>(
   return parsed.data;
 }
 
+/** Largest audio/video upload the server accepts (same cap the Express server had). */
+export const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
+
+class BodyTooLargeError extends Error {}
+
+/**
+ * Reads a multipart body, refusing anything over `maxBytes` with a 413.
+ * `Request.formData()` holds the whole body in memory, so the size is checked from
+ * Content-Length up front and counted while streaming (for chunked uploads).
+ * Returns the form, or a Response to return as-is (400 when the body isn't a form).
+ */
+export async function readFormData(
+  request: Request,
+  maxBytes = MAX_UPLOAD_BYTES
+): Promise<FormData | Response> {
+  const tooLarge = () =>
+    fail(413, `Upload is larger than ${Math.floor(maxBytes / (1024 * 1024))} MB`);
+
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return tooLarge();
+  if (!request.body) return fail(400, "Request body is not multipart form data");
+
+  let received = 0;
+  const limited = request.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > maxBytes) controller.error(new BodyTooLargeError());
+        else controller.enqueue(chunk);
+      },
+    })
+  );
+  try {
+    return await new Request(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: limited,
+      duplex: "half",
+    } as RequestInit).formData();
+  } catch (err) {
+    if (err instanceof BodyTooLargeError || received > maxBytes) return tooLarge();
+    return fail(400, "Request body is not multipart form data");
+  }
+}
+
 export function param(event: H3Event, name: string): string {
   return decodeURIComponent(getRouterParam(event, name) || "");
 }

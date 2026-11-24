@@ -8,7 +8,7 @@ import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { CancelledResponse, TranscribeFileResponse } from "../../../../../shared/schemas/contracts";
 import { encodePlayableMp3 } from "../../../../lib/youtube";
-import { fail, getSessionParam } from "../../../../lib/http";
+import { fail, getSessionParam, readFormData } from "../../../../lib/http";
 import {
   finishTranscribeJob,
   isCurrentJob,
@@ -43,7 +43,7 @@ defineRouteMeta({
               "file": {
                 "type": "string",
                 "format": "binary",
-                "description": ".wav, .mp3, .m4a, .webm, .ogg, .flac, or .mp4"
+                "description": ".wav, .mp3, .m4a, .webm, .ogg, .flac, or .mp4, up to 512 MB"
               },
               "asrModel": {
                 "type": "string",
@@ -104,6 +104,16 @@ defineRouteMeta({
           }
         }
       },
+      "413": {
+        "description": "Upload is larger than 512 MB",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
       "404": {
         "description": "Session not found",
         "content": {
@@ -134,13 +144,14 @@ export default defineHandler(async (event) => {
     return fail(404, "Session not found");
   }
 
-  const form = await event.req.formData().catch(() => null);
-  const file = form?.get("file");
+  const form = await readFormData(event.req);
+  if (form instanceof Response) return form;
+  const file = form.get("file");
   if (!(file instanceof File)) {
     return fail(400, "Upload an audio file as multipart form field 'file'");
   }
   const field = (name: string) => {
-    const v = form?.get(name);
+    const v = form.get(name);
     return typeof v === "string" && v ? v : undefined;
   };
   const uploadedFile = {

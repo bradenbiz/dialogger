@@ -11,6 +11,7 @@ import { isValidYouTubeUrl, parseDownloadProgress } from "../server/lib/youtube"
 import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/schemas/contracts";
 import "../shared/schemas/events";
 import { toOpenApiComponents } from "../shared/schemas/registry";
+import { readFormData } from "../server/lib/http";
 
 let testDataDir: string;
 
@@ -603,5 +604,63 @@ describe("OpenAPI schemas", () => {
 
     const turns = AppendTurnsRequestSchema.parse({ turn: { text: "hi" } });
     expect(turns.turn?.source).toBe("agent");
+  });
+});
+
+describe("readFormData upload cap", () => {
+  /** A multipart upload built from plain bytes, sent with Content-Length or streamed in chunks. */
+  async function upload(bytes: number, init: { chunked?: boolean } = {}): Promise<Request> {
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(bytes)], "clip.wav"));
+    const encoded = new Response(form);
+    const contentType = encoded.headers.get("content-type")!;
+    const body = new Uint8Array(await encoded.arrayBuffer());
+    if (!init.chunked) {
+      return new Request("http://localhost/upload", {
+        method: "POST",
+        headers: { "content-type": contentType, "content-length": String(body.byteLength) },
+        body,
+      });
+    }
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < body.byteLength; i += 1024) controller.enqueue(body.slice(i, i + 1024));
+        controller.close();
+      },
+    });
+    return new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+  }
+
+  it("returns the form when the body is under the cap", async () => {
+    const form = await readFormData(await upload(1000), 4096);
+    expect(form).toBeInstanceOf(FormData);
+    expect((form as FormData).get("file")).toBeInstanceOf(File);
+  });
+
+  it("rejects a declared Content-Length over the cap with 413", async () => {
+    const res = await readFormData(await upload(10_000), 4096);
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(413);
+  });
+
+  it("rejects a streamed body that grows past the cap with 413", async () => {
+    const req = await upload(10_000, { chunked: true });
+    expect(req.headers.get("content-length")).toBeNull();
+    const res = await readFormData(req, 4096);
+    expect((res as Response).status).toBe(413);
+  });
+
+  it("returns 400 for a body that isn't multipart", async () => {
+    const req = new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(((await readFormData(req)) as Response).status).toBe(400);
   });
 });
