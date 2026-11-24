@@ -364,10 +364,10 @@ export function SettingsModal({
                       className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5"
                     >
                       <option value="claude-cli">
-                        Claude Code CLI (Subscription · $0 API{mapperConfig?.claudeCliAvailable ? " ✓" : " — not found"})
+                        Claude Code CLI (Subscription · $0 API{mapperConfig ? (mapperConfig.claudeCliAvailable ? " ✓" : " — not found") : ""})
                       </option>
                       <option value="codex-cli">
-                        Codex CLI (Subscription · $0 API{mapperConfig?.codexCliAvailable ? " ✓" : " — not found"})
+                        Codex CLI (Subscription · $0 API{mapperConfig ? (mapperConfig.codexCliAvailable ? " ✓" : " — not found") : ""})
                       </option>
                       <option value="openai-compatible">
                         OpenAI-Compatible (OpenAI / xAI / Ollama)
