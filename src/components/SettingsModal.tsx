@@ -13,6 +13,7 @@ import type { DialogueSession } from "@shared/schemas/models";
 import type { MapperConfigInfo } from "@shared/schemas/events";
 import { api } from "@/lib/api";
 import { keys, useMapperConfig, useSpeechStatus, useVoices } from "@/lib/queries";
+import { Skeleton } from "@/components/Skeleton";
 
 interface SettingsModalProps {
   session: DialogueSession;
@@ -30,9 +31,10 @@ export function SettingsModal({
   const speechStatusQuery = useSpeechStatus();
   const mapperConfigQuery = useMapperConfig();
   const voicesQuery = useVoices();
-  const speechStatus = speechStatusQuery.data ?? null;
-  const mapperConfig = mapperConfigQuery.data ?? null;
-  const voices = voicesQuery.data ?? [];
+  // Each is undefined until it loads (skeletons stand in; see AGENTS.md)
+  const speechStatus = speechStatusQuery.data;
+  const mapperConfig = mapperConfigQuery.data;
+  const voices = voicesQuery.data;
   const [actionError, setActionError] = useState<string | null>(null);
   const loadError =
     speechStatusQuery.error ?? mapperConfigQuery.error ?? voicesQuery.error;
@@ -144,6 +146,9 @@ export function SettingsModal({
               </button>
             </div>
 
+            {!speechStatus && !speechStatusQuery.error && (
+              <Skeleton className="w-full h-24 rounded-xl" />
+            )}
             {speechStatus && (
               <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -430,7 +435,8 @@ export function SettingsModal({
                 </span>
                 <button
                   type="submit"
-                  disabled={saveMapper.isMutating}
+                  // Saving before the stored config loads would overwrite it with the form defaults
+                  disabled={!mapperConfig || saveMapper.isMutating}
                   className="px-3.5 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
                   {saveMapper.isMutating ? "Saving…" : "Save Mapper Config"}
@@ -443,13 +449,15 @@ export function SettingsModal({
           <section className="space-y-2.5">
             <div className="flex items-center gap-2 font-semibold text-stone-800 text-sm">
               <Fingerprint className="w-4 h-4 text-indigo-600" />
-              Enrolled Speaker Voices ({voices.length})
+              Enrolled Speaker Voices ({voices ? voices.length : <Skeleton className="w-3 h-3" />})
             </div>
             <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
               <p className="text-[11px] text-stone-500 leading-relaxed">
                 Whenever you reassign a transcript turn to a named person (or rename a speaker), Dialogger saves a clean voice seed here and prepends it to <strong>Nemotron 3 Diarization</strong> so future windows and future recordings lock onto that speaker automatically.
               </p>
-              {voices.length === 0 ? (
+              {!voices ? (
+                voicesQuery.error ? null : <Skeleton className="w-full h-8" />
+              ) : voices.length === 0 ? (
                 <p className="text-[11px] text-stone-400 italic">
                   No voices enrolled yet — click any speaker pill in a transcript to assign a name and enroll their voice.
                 </p>
