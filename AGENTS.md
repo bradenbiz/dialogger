@@ -95,7 +95,8 @@ Every PR description has:
    | 💄    | Add or update the UI and style files   |
 
 3. **Screenshots / recordings** of every new or changed page, component, or behavior. Use a recording when the change is an interaction (opening, closing, navigation, loading). If nothing visible changed, say the UI is visually unchanged.
-4. **How it was verified.** Commands run (typecheck, tests, build size) and what was checked in the browser.
+4. **Bundle size,** when the PR changes what the browser loads: a before/after table (base branch vs. the PR) of first-load JS (gzip and raw) and CSS (gzip), with the change. No per-commit breakdown. Say where any increase comes from, and list new lazy chunks with their sizes. Measure with `vite build` (the `assets/index-*.js` figures) on the base branch and on the PR.
+5. **How it was verified.** Commands run (typecheck, tests, build size) and what was checked in the browser.
 
 **Attaching screenshots.** `gh` uploads images and video itself (gh 2.100+, needs push access to the target repo). Reference the local file in the body where it should appear, then pass the same path to `--attach`; `gh` swaps the path for the hosted URL:
 
