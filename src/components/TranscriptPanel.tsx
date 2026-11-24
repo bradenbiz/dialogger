@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import AudioLines from "lucide-react/icons/audio-lines";
 import Check from "lucide-react/icons/check";
 import ChevronDown from "lucide-react/icons/chevron-down";
@@ -16,8 +16,12 @@ import Users from "lucide-react/icons/users";
 import Volume2 from "lucide-react/icons/volume-2";
 import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
 import { formatTime } from "@/lib/format";
-import { AudioScrubber } from "./AudioScrubber";
 import { Skeleton } from "@/components/Skeleton";
+
+// The scrubber only shows for sessions with audio, so it loads separately from the main bundle
+const AudioScrubber = lazy(() =>
+  import("./AudioScrubber").then((m) => ({ default: m.AudioScrubber }))
+);
 
 const PANEL_CLASS =
   "w-[360px] xl:w-[400px] border-r border-stone-200/90 bg-white flex flex-col shrink-0 relative";
@@ -256,13 +260,15 @@ export function TranscriptPanel({
               </a>
             )}
           </div>
-          <AudioScrubber
-            src={`/api/sessions/${encodeURIComponent(session.id)}/audio?v=${encodeURIComponent(session.updatedAt)}`}
-            durationHintSec={session.audio.durationSec}
-            seekRequest={seekRequest}
-            onTimeUpdate={onAudioTimeUpdate}
-            onPlayheadChange={setPlayheadSec}
-          />
+          <Suspense fallback={<Skeleton className="block w-full h-[79px] rounded-lg" />}>
+            <AudioScrubber
+              src={`/api/sessions/${encodeURIComponent(session.id)}/audio?v=${encodeURIComponent(session.updatedAt)}`}
+              durationHintSec={session.audio.durationSec}
+              seekRequest={seekRequest}
+              onTimeUpdate={onAudioTimeUpdate}
+              onPlayheadChange={setPlayheadSec}
+            />
+          </Suspense>
           <div className="flex items-center justify-between gap-2 pt-0.5">
             {isTranscribing ? (
               <button
