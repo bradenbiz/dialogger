@@ -1,88 +1,86 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { readBody } from "nitro/h3";
-import { z } from "zod";
-import { fail, getSessionParam, json } from "../../../../http";
+import { AppendTurnsRequestSchema, type AppendTurnsResponse } from "../../../../../shared/api";
+import { fail, getSessionParam, json, parseBody } from "../../../../http";
 import { runAutoMap } from "../../../../jobs";
 import { sessionStore } from "../../../../store";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Transcript"],
-    summary: "Append transcript turns (from a human, agent, or model)",
-    description: "Send either `turn` or `turns`. Turns are auto-mapped unless `autoMap` is false.",
-    requestBody: {
-      content: {
+    "tags": [
+      "Transcript"
+    ],
+    "summary": "Append transcript turns (from a human, agent, or model)",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              turn: { $ref: "#/components/schemas/TurnInput" },
-              turns: { type: "array", items: { $ref: "#/components/schemas/TurnInput" } },
-              autoMap: { type: "boolean" },
-            },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/AppendTurnsRequest"
+          }
+        }
+      }
     },
-    $global: {
-      components: {
-        schemas: {
-          TurnInput: {
-            type: "object",
-            required: ["text"],
-            properties: {
-              id: { type: "string" },
-              speakerId: { type: "string" },
-              speakerChannel: { type: "integer", minimum: 1, maximum: 16 },
-              speakerName: { type: "string", maxLength: 64 },
-              speakerRole: { type: "string", maxLength: 64 },
-              text: { type: "string" },
-              startSec: { type: "number", minimum: 0 },
-              endSec: { type: "number", minimum: 0 },
-              overlap: { type: "boolean" },
-              overlapWith: { type: "array", items: { type: "string" } },
-              source: { type: "string", enum: ["live", "file", "agent", "manual", "demo"], default: "agent" },
-            },
-          },
-        },
+    "responses": {
+      "201": {
+        "description": "Created",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppendTurnsResponse"
+            }
+          }
+        }
       },
-    },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
-});
-
-const turnSchema = z.object({
-  id: z.string().optional(),
-  speakerId: z.string().optional(),
-  speakerChannel: z.number().int().min(1).max(16).optional(),
-  speakerName: z.string().max(64).optional(),
-  speakerRole: z.string().max(64).optional(),
-  text: z.string().min(1),
-  startSec: z.number().nonnegative().optional(),
-  endSec: z.number().nonnegative().optional(),
-  overlap: z.boolean().optional(),
-  overlapWith: z.array(z.string()).optional(),
-  source: z.enum(["live", "file", "agent", "manual", "demo"]).default("agent"),
-});
-
-const bodySchema = z.object({
-  turns: z.array(turnSchema).optional(),
-  turn: turnSchema.optional(),
-  autoMap: z.boolean().optional(),
 });
 
 export default defineHandler(async (event) => {
   const session = getSessionParam(event);
   if (!session) return fail(404, "Session not found");
 
-  const parsed = bodySchema.safeParse(await readBody(event));
-  if (!parsed.success) return fail(400, parsed.error.flatten());
+  const body = await parseBody(event, AppendTurnsRequestSchema);
+  if (body instanceof Response) return body;
 
-  const list = parsed.data.turns || (parsed.data.turn ? [parsed.data.turn] : []);
+  const list = body.turns || (body.turn ? [body.turn] : []);
   if (list.length === 0) return fail(400, "Provide 'turn' or 'turns' array");
 
   const added = sessionStore.appendTurns(session.id, list);
-  if (parsed.data.autoMap ?? session.autoMap) {
+  if (body.autoMap ?? session.autoMap) {
     await runAutoMap(session.id);
   }
-  return json(201, { added, session: sessionStore.getSession(session.id) });
+  return json(201, {
+    added,
+    session: sessionStore.getSession(session.id) ?? session,
+  } satisfies AppendTurnsResponse);
 });

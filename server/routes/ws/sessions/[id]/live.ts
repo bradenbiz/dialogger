@@ -10,6 +10,11 @@ defineRouteMeta({
     summary: "WebSocket: stream 16 kHz mono PCM16 mic frames for live transcription",
     description:
       "Upgrade to a WebSocket and send binary PCM16 frames. Send `{\"type\":\"commit\"}` to end a segment or `{\"type\":\"clear\"}` to discard it. The server replies with `live.ready` / `live.error`; transcript and map updates arrive on the session's SSE stream.",
+    responses: {
+      101: { description: "Switching Protocols (WebSocket established)" },
+      401: { description: "Missing or invalid API key (only when DIALOGGER_API_KEY is set)" },
+      404: { description: "Session not found" },
+    },
   },
 });
 

@@ -1,9 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { readBody } from "nitro/h3";
 import { defineHandler, defineRouteMeta } from "nitro";
-import { z } from "zod";
-import { fail, getSessionParam } from "../../../http";
+import {
+  YouTubeImportRequestSchema,
+  type CancelledResponse,
+  type YouTubeImportResponse,
+} from "../../../../shared/api";
+import { fail, getSessionParam, parseBody } from "../../../http";
 import {
   broadcastJobIdle,
   finishTranscribeJob,
@@ -24,39 +27,93 @@ import { downloadYouTubeAudio, encodePlayableMp3, hasYtDlp } from "../../../yout
 
 defineRouteMeta({
   openAPI: {
-    tags: ["YouTube"],
-    summary: "Download a public YouTube video's audio, then transcribe, diarize, and map it live",
-    requestBody: {
-      content: {
+    "tags": [
+      "YouTube"
+    ],
+    "summary": "Download a public YouTube video's audio, then transcribe, diarize, and map it live",
+    "description": "Download progress (`Downloading YouTube audio… 42%`), then transcription progress, arrive as `speech.status` events on the session's SSE stream while this request is open.",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            required: ["url"],
-            properties: {
-              url: { type: "string" },
-              startSec: { type: "number", minimum: 0 },
-              durationSec: { type: "number", minimum: 0, description: "Clip length; omit for the whole video" },
-              asrModel: { type: "string" },
-              diarizationModel: { type: "string" },
-              autoMap: { type: "boolean" },
-              clearExisting: { type: "boolean" },
-            },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/YouTubeImportRequest"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/YouTubeImportResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/CancelledResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "501": {
+        "description": "yt-dlp is not installed on the server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
-const schema = z.object({
-  url: z.string().min(1),
-  startSec: z.number().nonnegative().optional(),
-  durationSec: z.number().nonnegative().optional(),
-  asrModel: z.string().optional(),
-  diarizationModel: z.string().optional(),
-  autoMap: z.boolean().optional(),
-  clearExisting: z.boolean().optional(),
-});
 
 export default defineHandler(async (event) => {
   const session = getSessionParam(event);
@@ -64,10 +121,8 @@ export default defineHandler(async (event) => {
     return fail(404, "Session not found");
   }
 
-  const parsed = schema.safeParse((await readBody(event)) || {});
-  if (!parsed.success) {
-    return fail(400, parsed.error.flatten());
-  }
+  const body = await parseBody(event, YouTubeImportRequestSchema);
+  if (body instanceof Response) return body;
 
   if (!(await hasYtDlp())) {
     return fail(501, "yt-dlp is not installed on this server.");
@@ -76,14 +131,14 @@ export default defineHandler(async (event) => {
   // Cancel any prior transcription on this session
   const abortController = startTranscribeJob(session.id);
 
-  const { url, startSec, durationSec } = parsed.data;
+  const { url, startSec, durationSec } = body;
   const asrModel =
-    parsed.data.asrModel || session.speechConfig.streamingAsrModel || "nemotron-3.5";
+    body.asrModel || session.speechConfig.streamingAsrModel || "nemotron-3.5";
   const diarizationModel =
-    parsed.data.diarizationModel ||
+    body.diarizationModel ||
     session.speechConfig.diarizationModel ||
     "nemotron-3-diarization";
-  const autoMap = parsed.data.autoMap ?? session.autoMap;
+  const autoMap = body.autoMap ?? session.autoMap;
   const isStreamingModel =
     asrModel === "nemotron-3.5" || asrModel === "nemotron-en";
 
@@ -117,7 +172,7 @@ export default defineHandler(async (event) => {
       },
     });
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
     sessionStore.broadcast(session.id, {
       type: "speech.status",
@@ -135,12 +190,12 @@ export default defineHandler(async (event) => {
     );
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     // Atomically swap staged audio & replace any previous transcript/map together (S3)
     fs.renameSync(stagingMp3, audioOut);
-    if (parsed.data.clearExisting || session.turns.length > 0 || session.audio) {
+    if (body.clearExisting || session.turns.length > 0 || session.audio) {
       sessionStore.clearForFreshRun(session.id, true);
     }
 
@@ -149,7 +204,7 @@ export default defineHandler(async (event) => {
       session.title === "New Dialogue Map" ||
       session.title === "Untitled Dialogue Map" ||
       session.title === "YouTube Dialogue Map" ||
-      parsed.data.clearExisting
+      body.clearExisting
     ) {
       sessionStore.updateSessionMeta(session.id, {
         title: downloaded.metadata.title.slice(0, 140),
@@ -267,8 +322,8 @@ export default defineHandler(async (event) => {
         duration: playableDur || streamRes.durationSec,
         turnsAdded,
         cancelled: streamRes.cancelled,
-        session: sessionStore.getSession(session.id),
-      };
+        session: sessionStore.getSession(session.id) ?? session,
+      } satisfies YouTubeImportResponse;
     }
 
     // Offline Parakeet TDT batch path (with full abort propagation + enrolled voice seeds!)
@@ -290,7 +345,7 @@ export default defineHandler(async (event) => {
     );
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     const ytBatchWindowCtx = createDiarizationWindowContext(result.slotNames);
@@ -334,11 +389,11 @@ export default defineHandler(async (event) => {
       diarizationModel: result.diarizationModel,
       duration: playableDur || result.duration,
       turnsAdded,
-      session: sessionStore.getSession(session.id),
-    };
+      session: sessionStore.getSession(session.id) ?? session,
+    } satisfies YouTubeImportResponse;
   } catch (err) {
     if (abortController.signal.aborted) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
     return fail(500, reportJobError(session.id, abortController, err));
   } finally {

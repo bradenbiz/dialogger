@@ -6,6 +6,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { defineHandler, defineRouteMeta } from "nitro";
+import type { CancelledResponse, TranscribeFileResponse } from "../../../../../shared/api";
 import { encodePlayableMp3 } from "../../../../youtube";
 import { fail, getSessionParam } from "../../../../http";
 import {
@@ -24,24 +25,106 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Transcription"],
-    summary: "Upload an audio/video file to transcribe, diarize, and map (replaces the session's audio)",
-    requestBody: {
-      content: {
+    "tags": [
+      "Transcription"
+    ],
+    "summary": "Upload an audio/video file to transcribe, diarize, and map (replaces the session's audio)",
+    "description": "Runs offline Parakeet TDT ASR plus Nemotron 3 diarization. Progress streams on the session's SSE events. Returns `CancelledResponse` if the job is stopped or replaced.",
+    "requestBody": {
+      "required": true,
+      "content": {
         "multipart/form-data": {
-          schema: {
-            type: "object",
-            required: ["file"],
-            properties: {
-              file: { type: "string", format: "binary" },
-              asrModel: { type: "string", default: "parakeet-tdt" },
-              diarizationModel: { type: "string", default: "nemotron-3-diarization" },
-              autoMap: { type: "string", enum: ["true", "false"] },
-            },
-          },
-        },
-      },
+          "schema": {
+            "type": "object",
+            "required": [
+              "file"
+            ],
+            "properties": {
+              "file": {
+                "type": "string",
+                "format": "binary",
+                "description": ".wav, .mp3, .m4a, .webm, .ogg, .flac, or .mp4"
+              },
+              "asrModel": {
+                "type": "string",
+                "default": "parakeet-tdt"
+              },
+              "diarizationModel": {
+                "type": "string",
+                "default": "nemotron-3-diarization"
+              },
+              "autoMap": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Defaults to the session's autoMap setting"
+              }
+            }
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TranscribeFileResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/CancelledResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
@@ -107,7 +190,7 @@ export default defineHandler(async (event) => {
     );
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     // Encode seekable MP3 to a unique staging path BEFORE modifying session state or existing audio (R3 S1).
@@ -121,7 +204,7 @@ export default defineHandler(async (event) => {
     );
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     if (!fs.existsSync(stagingMp3)) {
@@ -184,11 +267,11 @@ export default defineHandler(async (event) => {
       text: result.text,
       turnsAdded: added.length,
       turns: added,
-      session: sessionStore.getSession(session.id),
-    };
+      session: sessionStore.getSession(session.id) ?? session,
+    } satisfies TranscribeFileResponse;
   } catch (err) {
     if (abortController.signal.aborted) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
     return fail(500, reportJobError(session.id, abortController, err));
   } finally {

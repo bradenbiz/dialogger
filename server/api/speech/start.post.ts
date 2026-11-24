@@ -1,29 +1,76 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { readBody } from "nitro/h3";
-import { fail } from "../../http";
+import { SpeechStartRequestSchema } from "../../../shared/api";
+import type { SpeechEngineStatus } from "../../../shared/events";
+import { fail, parseBody } from "../../http";
 import { speechEngine } from "../../speech";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Speech"],
-    summary: "Start the local streaming speech server",
-    requestBody: {
-      content: {
+    "tags": [
+      "Speech"
+    ],
+    "summary": "Start the local streaming speech server",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: { type: "object", properties: { asrModel: { type: "string" }, diarModel: { type: "string" } } },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/SpeechStartRequest"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SpeechEngineStatus"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
 export default defineHandler(async (event) => {
+  const body = await parseBody(event, SpeechStartRequestSchema);
+  if (body instanceof Response) return body;
   try {
-    const body = await readBody<{ asrModel?: unknown; diarModel?: unknown }>(event);
-    const asrModel = typeof body?.asrModel === "string" ? body.asrModel : undefined;
-    const diarModel = typeof body?.diarModel === "string" ? body.diarModel : undefined;
-    await speechEngine.ensureStreamingServer({ asrModel, diarModel });
-    return await speechEngine.getStatus();
+    await speechEngine.ensureStreamingServer(body);
+    return (await speechEngine.getStatus()) satisfies SpeechEngineStatus;
   } catch (err) {
     return fail(500, err instanceof Error ? err.message : String(err));
   }

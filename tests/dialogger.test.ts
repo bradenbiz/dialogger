@@ -7,6 +7,9 @@ import { alignWordsToDiarization, wordsToDiarizedTurns } from "../server/speech"
 import { createDiarizationWindowContext, SessionStore } from "../server/store";
 import { DialogueMapperEngine } from "../server/mapper";
 import { isValidYouTubeUrl, parseDownloadProgress } from "../server/youtube";
+import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/api";
+import "../shared/events";
+import { toOpenApiComponents } from "../shared/schema-registry";
 
 let testDataDir: string;
 
@@ -549,5 +552,55 @@ describe("YouTube download progress parsing", () => {
 
   it("ignores unrelated output", () => {
     expect(parseDownloadProgress("[youtube] abc: Downloading webpage", 60)).toBeNull();
+  });
+});
+
+describe("OpenAPI schemas", () => {
+  const components = toOpenApiComponents();
+
+  function routeFiles(dir: string): string[] {
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory() ? routeFiles(full) : full.endsWith(".ts") ? [full] : [];
+    });
+  }
+
+  it("resolves every $ref used in route metadata to a shared Zod schema", () => {
+    const serverDir = path.resolve(import.meta.dirname, "../server");
+    const files = [...routeFiles(path.join(serverDir, "api")), ...routeFiles(path.join(serverDir, "routes"))];
+    const refs = new Set<string>();
+    for (const file of files) {
+      for (const m of fs.readFileSync(file, "utf8").matchAll(/#\/components\/schemas\/(\w+)/g)) {
+        refs.add(m[1]);
+      }
+    }
+    expect(refs.size).toBeGreaterThan(20);
+    const missing = [...refs].filter((name) => !(name in components));
+    expect(missing).toEqual([]);
+  });
+
+  it("emits internal refs only to components that exist", () => {
+    const text = JSON.stringify(components);
+    const missing = [...text.matchAll(/#\/components\/schemas\/(\w+)/g)]
+      .map((m) => m[1])
+      .filter((name) => !(name in components));
+    expect(missing).toEqual([]);
+  });
+
+  it("documents map ops as a discriminated union of every op", () => {
+    const op = components.IBISMapOp as { oneOf?: Array<{ properties: { op: { const: string } } }> };
+    expect(op.oneOf?.map((v) => v.properties.op.const)).toContain("add_node");
+    expect(op.oneOf?.length).toBe(10);
+  });
+
+  it("normalizes null fields from agents and applies defaults", () => {
+    const batch = IBISOpBatchSchema.parse({
+      ops: [{ op: "add_node", type: "question", label: "Why?", detail: null, parentId: null }],
+    });
+    expect(batch.actor).toBe("agent");
+    expect(batch.ops[0]).not.toHaveProperty("detail", null);
+
+    const turns = AppendTurnsRequestSchema.parse({ turn: { text: "hi" } });
+    expect(turns.turn?.source).toBe("agent");
   });
 });

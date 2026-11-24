@@ -1,51 +1,73 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { readBody } from "nitro/h3";
-import { z } from "zod";
-import { fail, param } from "../../../http";
+import { SessionInputSchema, type SessionResponse } from "../../../../shared/api";
+import { fail, param, parseBody } from "../../../http";
 import { sessionStore } from "../../../store";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Sessions"],
-    summary: "Update session title, focus, auto-map, or speech models",
-    requestBody: { content: { "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              title: { type: "string", maxLength: 160 },
-              rootFocus: { type: "string", maxLength: 300 },
-              autoMap: { type: "boolean" },
-              speechConfig: {
-                type: "object",
-                properties: {
-                  streamingAsrModel: { type: "string" },
-                  offlineAsrModel: { type: "string" },
-                  diarizationModel: { type: "string" },
-                },
-              },
-            },
-          },
-        } } },
+    "tags": [
+      "Sessions"
+    ],
+    "summary": "Update session title, focus, auto-map, or speech models",
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/SessionInput"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SessionResponse"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
-const schema = z.object({
-  title: z.string().max(160).optional(),
-  rootFocus: z.string().max(300).optional(),
-  autoMap: z.boolean().optional(),
-  speechConfig: z
-    .object({
-      streamingAsrModel: z.string().optional(),
-      offlineAsrModel: z.string().optional(),
-      diarizationModel: z.string().optional(),
-    })
-    .optional(),
-});
-
 export default defineHandler(async (event) => {
-  const parsed = schema.safeParse((await readBody(event)) || {});
-  if (!parsed.success) return fail(400, parsed.error.flatten());
-  const updated = sessionStore.updateSessionMeta(param(event, "id"), parsed.data);
+  const body = await parseBody(event, SessionInputSchema);
+  if (body instanceof Response) return body;
+  const updated = sessionStore.updateSessionMeta(param(event, "id"), body);
   if (!updated) return fail(404, "Session not found");
-  return { session: updated };
+  return { session: updated } satisfies SessionResponse;
 });

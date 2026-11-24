@@ -6,9 +6,43 @@ import { sessionStore } from "../../../../store";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Audio"],
-    summary: "Stream the session's audio (supports HTTP Range)",
-    responses: { 200: { description: "audio/mpeg", content: { "audio/mpeg": {} } }, 206: { description: "Partial content" } },
+    "tags": [
+      "Audio"
+    ],
+    "summary": "Stream the session's audio (supports HTTP Range)",
+    "responses": {
+      "200": {
+        "description": "The full MP3 (or `206 Partial Content` for a Range request; `416` for an unsatisfiable range)",
+        "content": {
+          "audio/mpeg": {
+            "schema": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "No audio attached to this session",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 

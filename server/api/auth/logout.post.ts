@@ -1,9 +1,25 @@
 import { defineHandler, defineRouteMeta } from "nitro";
+import type { OkResponse } from "../../../shared/api";
 import { SESSION_COOKIE } from "../../auth";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Auth"], summary: "Clear the session cookie",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Clear the session cookie",
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OkResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
@@ -12,5 +28,5 @@ export default defineHandler((event) => {
     "set-cookie",
     `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
   );
-  return { ok: true };
+  return { ok: true } satisfies OkResponse;
 });

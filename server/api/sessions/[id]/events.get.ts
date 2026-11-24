@@ -1,13 +1,48 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { createEventStream } from "nitro/h3";
+import type { SessionSSEEvent } from "../../../../shared/events";
 import { fail, getSessionParam } from "../../../http";
 import { sessionStore } from "../../../store";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Sessions"],
-    summary: "Server-sent event stream of live session updates",
-    responses: { 200: { description: "text/event-stream of session events", content: { "text/event-stream": {} } } },
+    "tags": [
+      "Sessions"
+    ],
+    "summary": "Server-sent event stream of live session updates",
+    "description": "Each `data:` line is a JSON `SessionEvent`. The first event is always `session.snapshot`. A comment ping is sent every 15 seconds.",
+    "responses": {
+      "200": {
+        "description": "text/event-stream of `SessionEvent` JSON payloads",
+        "content": {
+          "text/event-stream": {
+            "schema": {
+              "$ref": "#/components/schemas/SessionEvent"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
@@ -16,7 +51,7 @@ export default defineHandler((event) => {
   if (!session) return fail(404, "Session not found");
 
   const stream = createEventStream(event);
-  const send = (data: unknown) => void stream.push(JSON.stringify(data));
+  const send = (data: SessionSSEEvent) => void stream.push(JSON.stringify(data));
 
   send({ type: "session.snapshot", session });
   const unsubscribe = sessionStore.subscribe(session.id, send);

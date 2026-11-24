@@ -1,51 +1,76 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { readBody } from "nitro/h3";
-import { z } from "zod";
+import { MapperConfigUpdateSchema } from "../../../shared/api";
+import type { MapperConfigInfo } from "../../../shared/events";
 import { isOwnerRequest } from "../../auth";
-import { fail } from "../../http";
+import { fail, parseBody } from "../../http";
 import { dialogueMapper } from "../../mapper";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Mapper"],
-    summary: "Update the dialogue mapper configuration (owner only)",
-    requestBody: {
-      content: {
+    "tags": [
+      "Mapper"
+    ],
+    "summary": "Update the dialogue mapper configuration (owner only)",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              mode: { type: "string", enum: ["llm", "heuristic", "agent-only"] },
-              provider: {
-                type: "string",
-                enum: ["claude-cli", "codex-cli", "openai-compatible", "anthropic", "heuristic"],
-              },
-              baseUrl: { type: "string" },
-              model: { type: "string" },
-              apiKey: { type: "string" },
-            },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/MapperConfigUpdate"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/MapperConfig"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "Owner authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
-});
-
-const schema = z.object({
-  mode: z.enum(["llm", "heuristic", "agent-only"]).optional(),
-  provider: z
-    .enum(["claude-cli", "codex-cli", "openai-compatible", "anthropic", "heuristic"])
-    .optional(),
-  baseUrl: z.string().optional(),
-  model: z.string().optional(),
-  apiKey: z.string().optional(),
 });
 
 export default defineHandler(async (event) => {
   if (!isOwnerRequest(event)) {
     return fail(403, "Owner authentication required to modify mapper settings");
   }
-  const parsed = schema.safeParse(await readBody(event));
-  if (!parsed.success) return fail(400, parsed.error.flatten());
-  return dialogueMapper.updateConfig(parsed.data);
+  const body = await parseBody(event, MapperConfigUpdateSchema);
+  if (body instanceof Response) return body;
+  return dialogueMapper.updateConfig(body) satisfies MapperConfigInfo;
 });

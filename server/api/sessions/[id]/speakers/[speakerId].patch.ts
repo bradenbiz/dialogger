@@ -1,42 +1,79 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { readBody } from "nitro/h3";
-import { z } from "zod";
-import { fail, param } from "../../../../http";
+import { RenameSpeakerRequestSchema, type SpeakerResponse } from "../../../../../shared/api";
+import { fail, param, parseBody } from "../../../../http";
 import { sessionStore } from "../../../../store";
 import { voiceBank } from "../../../../voicebank";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Speakers"],
-    summary: "Rename a speaker (also enrolls their voice from their cleanest turn)",
-    requestBody: {
-      content: {
+    "tags": [
+      "Speakers"
+    ],
+    "summary": "Rename a speaker (also enrolls their voice from their cleanest turn)",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            required: ["name"],
-            properties: { name: { type: "string", maxLength: 64 }, role: { type: "string", maxLength: 64 } },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/RenameSpeakerRequest"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SpeakerResponse"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
-const schema = z.object({
-  name: z.string().min(1).max(64),
-  role: z.string().max(64).optional(),
-});
-
 export default defineHandler(async (event) => {
-  const parsed = schema.safeParse((await readBody(event)) || {});
-  if (!parsed.success) return fail(400, parsed.error.flatten());
+  const body = await parseBody(event, RenameSpeakerRequestSchema);
+  if (body instanceof Response) return body;
   const sessionId = param(event, "id");
   const speaker = sessionStore.renameSpeaker(
     sessionId,
     param(event, "speakerId"),
-    parsed.data.name,
-    parsed.data.role
+    body.name,
+    body.role
   );
   if (!speaker) return fail(404, "Session not found");
 
@@ -60,5 +97,7 @@ export default defineHandler(async (event) => {
     }
   }
 
-  return { speaker: session?.speakers.find((s) => s.id === speaker.id) || speaker };
+  return {
+    speaker: session?.speakers.find((s) => s.id === speaker.id) || speaker,
+  } satisfies SpeakerResponse;
 });

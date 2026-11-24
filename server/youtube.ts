@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import type { YouTubeMetadata } from "../shared/api";
 
 const execFileAsync = promisify(execFile);
 
@@ -14,13 +15,7 @@ const YT_DLP_JS_RUNTIME_ARGS = ["--js-runtimes", `node:${process.execPath}`];
 const YT_URL_RE =
   /^https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?|shorts\/|live\/|embed\/)|youtu\.be\/)/i;
 
-export interface YouTubeMetadata {
-  id: string;
-  title: string;
-  channel: string;
-  durationSec: number;
-  webpageUrl: string;
-}
+export type { YouTubeMetadata };
 
 export interface DownloadedYouTubeAudio {
   metadata: YouTubeMetadata;

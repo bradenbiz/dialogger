@@ -2,39 +2,81 @@ import { defineHandler, defineRouteMeta } from "nitro";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readBody } from "nitro/h3";
-import { z } from "zod";
-import { fail, getSessionParam } from "../../../../http";
+import { TrimAudioRequestSchema, type SessionResponse } from "../../../../../shared/api";
+import { fail, getSessionParam, parseBody } from "../../../../http";
 import { cancelActiveTranscribe } from "../../../../jobs";
 import { sessionStore } from "../../../../store";
 import { probeDurationSec } from "../../../../youtube";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Audio"],
-    summary: "Trim the session's saved audio",
-    requestBody: {
-      content: {
+    "tags": [
+      "Audio"
+    ],
+    "summary": "Trim the session's saved audio",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            required: ["startSec"],
-            properties: {
-              startSec: { type: "number", minimum: 0 },
-              endSec: { type: "number" },
-              clearTranscriptAndMap: { type: "boolean" },
-            },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/TrimAudioRequest"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SessionResponse"
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session or its saved audio not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
-});
-
-const schema = z.object({
-  startSec: z.number().nonnegative(),
-  endSec: z.number().positive().optional(),
-  clearTranscriptAndMap: z.boolean().optional(),
 });
 
 export default defineHandler(async (event) => {
@@ -43,10 +85,10 @@ export default defineHandler(async (event) => {
   const audioPath = sessionStore.getAudioFilePath(session.id);
   if (!audioPath) return fail(404, "No saved audio attached to this session");
 
-  const parsed = schema.safeParse((await readBody(event)) || {});
-  if (!parsed.success) return fail(400, parsed.error.flatten());
+  const body = await parseBody(event, TrimAudioRequestSchema);
+  if (body instanceof Response) return body;
 
-  const { startSec, endSec, clearTranscriptAndMap } = parsed.data;
+  const { startSec, endSec, clearTranscriptAndMap } = body;
   if (endSec !== undefined && endSec <= startSec + 1) {
     return fail(400, "endSec must be at least 1 second after startSec");
   }
@@ -71,7 +113,8 @@ export default defineHandler(async (event) => {
         newDurationSec || Math.max(0, (endSec ?? session.audio?.durationSec ?? 0) - startSec),
       clearTranscriptAndMap: Boolean(clearTranscriptAndMap),
     });
-    return { session: updated };
+    if (!updated) return fail(404, "Session not found");
+    return { session: updated } satisfies SessionResponse;
   } catch (err) {
     try {
       if (fs.existsSync(tmpOut)) fs.unlinkSync(tmpOut);

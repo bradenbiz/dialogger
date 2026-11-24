@@ -3,10 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { readBody } from "nitro/h3";
 import { defineHandler, defineRouteMeta } from "nitro";
-import { z } from "zod";
-import { fail, getSessionParam } from "../../../../http";
+import {
+  TranscribeSavedAudioRequestSchema,
+  type CancelledResponse,
+  type TranscribeSavedAudioResponse,
+} from "../../../../../shared/api";
+import { fail, getSessionParam, parseBody } from "../../../../http";
 import {
   broadcastJobIdle,
   finishTranscribeJob,
@@ -25,34 +28,83 @@ import { voiceBank } from "../../../../voicebank";
 
 defineRouteMeta({
   openAPI: {
-    tags: ["Transcription"],
-    summary: "Re-run live streaming transcription over the session's saved audio",
-    requestBody: {
-      content: {
+    "tags": [
+      "Transcription"
+    ],
+    "summary": "Re-run live streaming transcription over the session's saved audio",
+    "description": "Streams the saved audio through Nemotron 3.5 + Nemotron 3 diarization. Turns, partial text, and progress arrive on the session's SSE events while this request is open.",
+    "requestBody": {
+      "required": true,
+      "content": {
         "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              startSec: { type: "number", minimum: 0, description: "Resume from this playhead, replacing later turns" },
-              asrModel: { type: "string" },
-              diarizationModel: { type: "string" },
-              autoMap: { type: "boolean" },
-              clearExisting: { type: "boolean" },
-            },
-          },
-        },
-      },
+          "schema": {
+            "$ref": "#/components/schemas/TranscribeSavedAudioRequest"
+          }
+        }
+      }
     },
+    "responses": {
+      "200": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TranscribeSavedAudioResponse"
+                },
+                {
+                  "$ref": "#/components/schemas/CancelledResponse"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "400": {
+        "description": "Invalid request body",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "Missing or invalid API key (only when DIALOGGER_API_KEY or DIALOGGER_OWNER_KEY is set)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Session not found, or it has no saved audio",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "Server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
   },
 });
 
-const schema = z.object({
-  startSec: z.number().nonnegative().optional(),
-  asrModel: z.string().optional(),
-  diarizationModel: z.string().optional(),
-  autoMap: z.boolean().optional(),
-  clearExisting: z.boolean().optional(),
-});
 
 export default defineHandler(async (event) => {
   const session = getSessionParam(event);
@@ -65,21 +117,19 @@ export default defineHandler(async (event) => {
     return fail(404, "No saved audio attached to this session");
   }
 
-  const parsed = schema.safeParse((await readBody(event)) || {});
-  if (!parsed.success) {
-    return fail(400, parsed.error.flatten());
-  }
+  const body = await parseBody(event, TranscribeSavedAudioRequestSchema);
+  if (body instanceof Response) return body;
 
   const abortController = startTranscribeJob(session.id);
 
   const asrModel =
-    parsed.data.asrModel || session.speechConfig.streamingAsrModel || "nemotron-3.5";
+    body.asrModel || session.speechConfig.streamingAsrModel || "nemotron-3.5";
   const diarizationModel =
-    parsed.data.diarizationModel ||
+    body.diarizationModel ||
     session.speechConfig.diarizationModel ||
     "nemotron-3-diarization";
-  const autoMap = parsed.data.autoMap ?? session.autoMap;
-  const startSec = Math.max(0, parsed.data.startSec || 0);
+  const autoMap = body.autoMap ?? session.autoMap;
+  const startSec = Math.max(0, body.startSec || 0);
 
   let inputForStream = audioPath;
   let cleanupSlice: (() => void) | null = null;
@@ -93,7 +143,7 @@ export default defineHandler(async (event) => {
     });
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     if (startSec > 0) {
@@ -130,11 +180,11 @@ export default defineHandler(async (event) => {
     }
 
     if (!isCurrentJob(session.id, abortController)) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
 
     // Now that speech startup & slicing succeeded, apply staged clear or exact playhead truncation (S7)
-    if (parsed.data.clearExisting) {
+    if (body.clearExisting) {
       sessionStore.clearForFreshRun(session.id, true);
       stagedResetDone = true;
     } else if (startSec > 0) {
@@ -247,11 +297,11 @@ export default defineHandler(async (event) => {
       turnsAdded,
       stagedResetDone,
       cancelled: streamRes.cancelled,
-      session: sessionStore.getSession(session.id),
-    };
+      session: sessionStore.getSession(session.id) ?? session,
+    } satisfies TranscribeSavedAudioResponse;
   } catch (err) {
     if (abortController.signal.aborted) {
-      return { cancelled: true };
+      return { cancelled: true } satisfies CancelledResponse;
     }
     return fail(500, reportJobError(session.id, abortController, err));
   } finally {
