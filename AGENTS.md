@@ -94,5 +94,15 @@ Every PR description has:
    | 📝    | Add or update documentation            |
    | 💄    | Add or update the UI and style files   |
 
-3. **Screenshots / recordings** of every new or changed page, component, or behavior. Use a recording when the change is an interaction (opening, closing, navigation, loading).
+3. **Screenshots / recordings** of every new or changed page, component, or behavior. Use a recording when the change is an interaction (opening, closing, navigation, loading). If nothing visible changed, say the UI is visually unchanged.
 4. **How it was verified.** Commands run (typecheck, tests, build size) and what was checked in the browser.
+
+**Attaching screenshots.** `gh` uploads images and video itself (gh 2.100+, needs push access to the target repo). Reference the local file in the body where it should appear, then pass the same path to `--attach`; `gh` swaps the path for the hosted URL:
+
+```bash
+# pr-body.md contains: ![Swagger UI at /_swagger](/abs/path/swagger.png)
+gh pr create --repo bradenbiz/dialogger --base main --head <you>:<branch> \
+  --title "…" --body-file pr-body.md --attach "/abs/path/swagger.png#Swagger UI at /_swagger"
+```
+
+An attached file the body doesn't reference is appended at the end. `gh pr edit` and `gh pr comment` take `--attach` too. Don't commit screenshots to the repo or push a branch just to host them. Take screenshots against a throwaway `DIALOGGER_DATA_DIR` (e.g. with the Live Demo), so no real session content ends up in a public PR.
