@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import type { EnrolledVoiceInfo } from "../shared/events";
+import type { EnrolledVoiceInfo } from "../../shared/schemas/events";
 
 const execFileAsync = promisify(execFile);
 

@@ -1,16 +1,14 @@
 import { useState } from "react";
-import {
-  BookMarked,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  X,
-} from "lucide-react";
+import BookMarked from "lucide-react/icons/book-bookmark";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import ChevronRight from "lucide-react/icons/chevron-right";
+import Plus from "lucide-react/icons/plus";
+import X from "lucide-react/icons/x";
 import type {
   HostContextCategory,
   HostContextItem,
   Speaker,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
 
 interface HostContextBarProps {
   items: HostContextItem[];

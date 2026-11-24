@@ -8,8 +8,8 @@ import {
   type IBISNode,
   type IBISOpBatch,
   type TranscriptTurn,
-} from "../shared/ibis";
-import type { MapperConfigInfo } from "../shared/events";
+} from "../../shared/schemas/models";
+import type { MapperConfigInfo } from "../../shared/schemas/events";
 import {
   CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT,
   buildMappingUserPrompt,
@@ -17,6 +17,47 @@ import {
 import { z } from "zod";
 
 const execFileAsync = promisify(execFile);
+
+/** A failed CLI run, with a one-line reason instead of Node's "Command failed: <argv>" dump. */
+class CliError extends Error {
+  constructor(
+    message: string,
+    readonly stdout: string
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Runs a CLI with `input` on stdin, then closes it. An open stdin makes `claude -p`
+ * wait 3 s for input before every call.
+ */
+async function runCli(cmd: string, args: string[], input = ""): Promise<string> {
+  const run = execFileAsync(cmd, args, {
+    timeout: 90_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  run.child.stdin?.end(input);
+  try {
+    return (await run).stdout;
+  } catch (err) {
+    const { stdout = "", stderr = "", killed } = err as {
+      stdout?: string;
+      stderr?: string;
+      killed?: boolean;
+    };
+    const detail = stderr.trim().split("\n").pop() || "";
+    throw new CliError(
+      killed
+        ? `${cmd} timed out`
+        : `${cmd} exited with an error${detail ? `: ${detail}` : ""}`,
+      stdout
+    );
+  }
+}
+
+/** Why the LLM mapper didn't run; reported to the UI when it falls back to the heuristic. */
+export type MapperBatch = IBISOpBatch & { fallbackReason?: string };
 
 const LLMResponseSchema = z.object({
   summary: z.string().optional(),
@@ -183,7 +224,7 @@ export class DialogueMapperEngine {
   async analyzeTurns(
     session: DialogueSession,
     turns: TranscriptTurn[]
-  ): Promise<IBISOpBatch> {
+  ): Promise<MapperBatch> {
     if (turns.length === 0) {
       return {
         actor: "model",
@@ -212,10 +253,14 @@ export class DialogueMapperEngine {
         try {
           return await this.runLLMMapper(session, turns);
         } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
           console.warn(
-            `[mapper] ${this.config.provider} (${this.config.model}) failed, falling back to heuristic mapper:`,
-            err
+            `[mapper] ${this.config.provider} (${this.config.model}) failed, falling back to heuristic mapper: ${reason}`
           );
+          return {
+            ...this.runHeuristicMapper(session, turns),
+            fallbackReason: `${reason.replace(/\.?\s*$/, ".")} Mapped with the built-in heuristic instead.`,
+          };
         }
       }
     }
@@ -231,32 +276,43 @@ export class DialogueMapperEngine {
     let rawText = "";
 
     if (this.config.provider === "claude-cli") {
-      const { stdout } = await execFileAsync(
-        "claude",
-        [
-          "-p",
-          "--model",
-          this.config.model || "sonnet",
-          "--tools",
-          "",
-          "--no-session-persistence",
-          "--output-format",
-          "json",
-          "--system-prompt",
-          CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT,
-          userPrompt,
-        ],
-        {
-          timeout: 90_000,
-          maxBuffer: 16 * 1024 * 1024,
-        }
-      );
-      const envelope = JSON.parse(stdout.trim()) as {
-        result?: string;
-        is_error?: boolean;
-      };
+      // The prompt goes on stdin: it grows with the session and could exceed argv limits.
+      let stdout: string;
+      try {
+        stdout = await runCli(
+          "claude",
+          [
+            "-p",
+            "--model",
+            this.config.model || "sonnet",
+            "--tools",
+            "",
+            "--no-session-persistence",
+            "--output-format",
+            "json",
+            "--system-prompt",
+            CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT,
+          ],
+          userPrompt
+        );
+      } catch (err) {
+        // On failure (e.g. an expired sign-in) claude still prints its JSON envelope.
+        if (!(err instanceof CliError)) throw err;
+        stdout = err.stdout;
+        if (!stdout.trim()) throw err;
+      }
+      let envelope: { result?: string; is_error?: boolean };
+      try {
+        envelope = JSON.parse(stdout.trim());
+      } catch {
+        throw new Error(`Claude CLI returned unexpected output: ${stdout.slice(0, 200)}`);
+      }
       if (envelope.is_error || !envelope.result) {
-        throw new Error(`Claude CLI error: ${stdout.slice(0, 240)}`);
+        const reason = envelope.result || "no result";
+        const signIn = /authenticat|oauth|log ?in|credential/i.test(reason)
+          ? " Run `claude` in a terminal and sign in again."
+          : "";
+        throw new Error(`Claude CLI: ${reason}.${signIn}`);
       }
       rawText = envelope.result;
     } else if (this.config.provider === "codex-cli") {
@@ -265,12 +321,10 @@ export class DialogueMapperEngine {
       if (this.config.model) {
         args.push("--model", this.config.model);
       }
-      args.push(combinedPrompt);
-      const { stdout } = await execFileAsync("codex", args, {
-        timeout: 90_000,
-        maxBuffer: 16 * 1024 * 1024,
-      });
-      rawText = stdout;
+      // `-` makes codex read the whole prompt from stdin (with a prompt argument, piped
+      // stdin would be appended as an extra block). Keeps long sessions under argv limits.
+      args.push("-");
+      rawText = await runCli("codex", args, combinedPrompt);
     } else if (this.config.provider === "anthropic") {
       const url = `${this.config.baseUrl.replace(/\/$/, "")}/messages`;
       const res = await fetch(url, {

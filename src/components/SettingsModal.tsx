@@ -1,21 +1,19 @@
 import { useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  Cpu,
-  Fingerprint,
-  Play,
-  RefreshCw,
-  Sparkles,
-  Trash2,
-  X,
-  XCircle,
-} from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import CheckCircle2 from "lucide-react/icons/circle-check";
+import Cpu from "lucide-react/icons/cpu";
+import Fingerprint from "lucide-react/icons/fingerprint-pattern";
+import Play from "lucide-react/icons/play";
+import RefreshCw from "lucide-react/icons/refresh-cw";
+import Sparkles from "lucide-react/icons/sparkles";
+import Trash2 from "lucide-react/icons/trash";
+import X from "lucide-react/icons/x";
+import XCircle from "lucide-react/icons/circle-x";
+import type { DialogueSession } from "@shared/schemas/models";
 import type {
   EnrolledVoiceInfo,
   MapperConfigInfo,
   SpeechEngineStatus,
-} from "@shared/events";
+} from "@shared/schemas/events";
 import { api } from "@/lib/api";
 
 interface SettingsModalProps {

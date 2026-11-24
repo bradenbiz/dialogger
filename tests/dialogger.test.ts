@@ -2,11 +2,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { computeConklinStats, type IBISNode, type TranscriptTurn } from "../shared/ibis";
-import { alignWordsToDiarization, wordsToDiarizedTurns } from "../server/speech";
-import { createDiarizationWindowContext, SessionStore } from "../server/store";
-import { DialogueMapperEngine } from "../server/mapper";
-import { isValidYouTubeUrl } from "../server/youtube";
+import { type IBISNode, type TranscriptTurn } from "../shared/schemas/models";
+import { computeConklinStats } from "../shared/ibis";
+import { alignWordsToDiarization, wordsToDiarizedTurns } from "../server/lib/speech";
+import { createDiarizationWindowContext, SessionStore } from "../server/lib/store";
+import { DialogueMapperEngine } from "../server/lib/mapper";
+import { isValidYouTubeUrl, parseDownloadProgress } from "../server/lib/youtube";
+import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/schemas/contracts";
+import "../shared/schemas/events";
+import { toOpenApiComponents } from "../shared/schemas/registry";
+import { readFormData } from "../server/lib/http";
 
 let testDataDir: string;
 
@@ -530,5 +535,132 @@ describe("alignWordsToDiarization", () => {
     ];
     const aligned = alignWordsToDiarization(words, segments);
     expect(aligned.map((w) => w.speaker)).toEqual([1, 1, 2, 2]);
+  });
+});
+
+describe("YouTube download progress parsing", () => {
+  it("reads byte progress from the yt-dlp progress template", () => {
+    expect(parseDownloadProgress("DLPROG 4889046 19556184 NA", 0)).toBeCloseTo(0.25);
+    expect(parseDownloadProgress("DLPROG 500 NA 1000", 0)).toBeCloseTo(0.5);
+    expect(parseDownloadProgress("DLPROG 500 NA NA", 0)).toBeNull();
+  });
+
+  it("reads ffmpeg time= progress for clipped section downloads", () => {
+    const line = "size=     512KiB time=00:00:30.00 bitrate= 135.5kbits/s speed=1.71x";
+    expect(parseDownloadProgress(line, 60)).toBeCloseTo(0.5);
+    expect(parseDownloadProgress(line, 0)).toBeNull();
+    expect(parseDownloadProgress("size= 1KiB time=00:01:30.00", 60)).toBe(1);
+  });
+
+  it("ignores unrelated output", () => {
+    expect(parseDownloadProgress("[youtube] abc: Downloading webpage", 60)).toBeNull();
+  });
+});
+
+describe("OpenAPI schemas", () => {
+  const components = toOpenApiComponents();
+
+  function routeFiles(dir: string): string[] {
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory() ? routeFiles(full) : full.endsWith(".ts") ? [full] : [];
+    });
+  }
+
+  it("resolves every $ref used in route metadata to a shared Zod schema", () => {
+    const serverDir = path.resolve(import.meta.dirname, "../server");
+    const files = [...routeFiles(path.join(serverDir, "api")), ...routeFiles(path.join(serverDir, "routes"))];
+    const refs = new Set<string>();
+    for (const file of files) {
+      for (const m of fs.readFileSync(file, "utf8").matchAll(/#\/components\/schemas\/(\w+)/g)) {
+        refs.add(m[1]);
+      }
+    }
+    expect(refs.size).toBeGreaterThan(20);
+    const missing = [...refs].filter((name) => !(name in components));
+    expect(missing).toEqual([]);
+  });
+
+  it("emits internal refs only to components that exist", () => {
+    const text = JSON.stringify(components);
+    const missing = [...text.matchAll(/#\/components\/schemas\/(\w+)/g)]
+      .map((m) => m[1])
+      .filter((name) => !(name in components));
+    expect(missing).toEqual([]);
+  });
+
+  it("documents map ops as a discriminated union of every op", () => {
+    const op = components.IBISMapOp as { oneOf?: Array<{ properties: { op: { const: string } } }> };
+    expect(op.oneOf?.map((v) => v.properties.op.const)).toContain("add_node");
+    expect(op.oneOf?.length).toBe(10);
+  });
+
+  it("normalizes null fields from agents and applies defaults", () => {
+    const batch = IBISOpBatchSchema.parse({
+      ops: [{ op: "add_node", type: "question", label: "Why?", detail: null, parentId: null }],
+    });
+    expect(batch.actor).toBe("agent");
+    expect(batch.ops[0]).not.toHaveProperty("detail", null);
+
+    const turns = AppendTurnsRequestSchema.parse({ turn: { text: "hi" } });
+    expect(turns.turn?.source).toBe("agent");
+  });
+});
+
+describe("readFormData upload cap", () => {
+  /** A multipart upload built from plain bytes, sent with Content-Length or streamed in chunks. */
+  async function upload(bytes: number, init: { chunked?: boolean } = {}): Promise<Request> {
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(bytes)], "clip.wav"));
+    const encoded = new Response(form);
+    const contentType = encoded.headers.get("content-type")!;
+    const body = new Uint8Array(await encoded.arrayBuffer());
+    if (!init.chunked) {
+      return new Request("http://localhost/upload", {
+        method: "POST",
+        headers: { "content-type": contentType, "content-length": String(body.byteLength) },
+        body,
+      });
+    }
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < body.byteLength; i += 1024) controller.enqueue(body.slice(i, i + 1024));
+        controller.close();
+      },
+    });
+    return new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+  }
+
+  it("returns the form when the body is under the cap", async () => {
+    const form = await readFormData(await upload(1000), 4096);
+    expect(form).toBeInstanceOf(FormData);
+    expect((form as FormData).get("file")).toBeInstanceOf(File);
+  });
+
+  it("rejects a declared Content-Length over the cap with 413", async () => {
+    const res = await readFormData(await upload(10_000), 4096);
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(413);
+  });
+
+  it("rejects a streamed body that grows past the cap with 413", async () => {
+    const req = await upload(10_000, { chunked: true });
+    expect(req.headers.get("content-length")).toBeNull();
+    const res = await readFormData(req, 4096);
+    expect((res as Response).status).toBe(413);
+  });
+
+  it("returns 400 for a body that isn't multipart", async () => {
+    const req = new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(((await readFormData(req)) as Response).status).toBe(400);
   });
 });

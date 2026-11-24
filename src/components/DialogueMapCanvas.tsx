@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ChevronRight from "lucide-react/icons/chevron-right";
+import Compass from "lucide-react/icons/compass";
+import Maximize2 from "lucide-react/icons/maximize-2";
+import Minus from "lucide-react/icons/minus";
+import Play from "lucide-react/icons/play";
+import Plus from "lucide-react/icons/plus";
+import Upload from "lucide-react/icons/upload";
+import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import {
-  ChevronRight,
-  Compass,
-  Maximize2,
-  Minus,
-  Play,
-  Plus,
-  Upload,
-  Youtube,
-} from "lucide-react";
-import {
-  IBIS_NODE_META,
-  LEGAL_IBIS_CHILDREN,
-  type ConklinMapStats,
   type DialogueSession,
   type IBISNodeType,
   type Speaker,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
+import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN, type ConklinMapStats } from "@shared/ibis";
 import { computeDialogueMapLayout, type PositionedNode } from "@/lib/layout";
+import { preloadOnIntent } from "@/components/panels";
 import type { FacilitationLens } from "./ConklinMetrics";
 
 interface DialogueMapCanvasProps {
@@ -249,6 +246,7 @@ export function DialogueMapCanvas({
               <button
                 type="button"
                 onClick={onOpenYouTube}
+                {...preloadOnIntent("youtube")}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-stone-900 text-white hover:bg-stone-800 transition shadow-xs"
               >
                 <Youtube className="w-4 h-4 text-rose-400" />

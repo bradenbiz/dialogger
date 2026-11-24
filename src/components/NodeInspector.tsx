@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
+import Activity from "lucide-react/icons/activity";
+import Award from "lucide-react/icons/award";
+import BookOpen from "lucide-react/icons/book-open";
+import MessageSquareQuote from "lucide-react/icons/message-square-quote";
+import Plus from "lucide-react/icons/plus";
+import Trash2 from "lucide-react/icons/trash";
+import X from "lucide-react/icons/x";
 import {
-  Activity,
-  Award,
-  BookOpen,
-  MessageSquareQuote,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  IBIS_NODE_META,
-  LEGAL_IBIS_CHILDREN,
   type DialogueSession,
   type IBISNode,
   type IBISNodeType,
   type Speaker,
   type TranscriptTurn,
-} from "@shared/ibis";
-import { formatTime } from "@/lib/export";
+} from "@shared/schemas/models";
+import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN } from "@shared/ibis";
+import { formatTime } from "@/lib/format";
 
 interface NodeInspectorProps {
   session: DialogueSession;

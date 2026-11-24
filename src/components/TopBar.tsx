@@ -1,26 +1,23 @@
 import { useRef, useState } from "react";
-import {
-  Bot,
-  ChevronDown,
-  Download,
-  FileAudio,
-  Mic,
-  MicOff,
-  Play,
-  Plus,
-  Settings,
-  Square,
-  Trash2,
-  Upload,
-  Youtube,
-} from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import Bot from "lucide-react/icons/bot";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import Download from "lucide-react/icons/download";
+import FileAudio from "lucide-react/icons/file-headphone";
+import Mic from "lucide-react/icons/mic";
+import MicOff from "lucide-react/icons/mic-off";
+import Play from "lucide-react/icons/play";
+import Plus from "lucide-react/icons/plus";
+import Settings from "lucide-react/icons/settings";
+import Square from "lucide-react/icons/square";
+import Trash2 from "lucide-react/icons/trash";
+import Upload from "lucide-react/icons/upload";
+import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
+import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
-import {
-  exportMapAsMarkdown,
-  exportMapAsSvg,
-  exportSessionAsJson,
-} from "@/lib/export";
+import { preloadOnIntent } from "@/components/panels";
+
+/** The exporters only load when the user picks one from the Export menu. */
+const loadExport = () => import("@/lib/export");
 
 interface TopBarProps {
   session: DialogueSession;
@@ -296,6 +293,7 @@ export function TopBar({
           type="button"
           disabled={isTranscribing}
           onClick={onOpenYouTubeModal}
+          {...preloadOnIntent("youtube")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-800 transition disabled:opacity-50"
           title="Paste a YouTube link to download audio, diarize locally, and map live"
         >
@@ -331,6 +329,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenAgentModal}
+          {...preloadOnIntent("agent")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 transition"
           title="Connect an AI agent or model to drive this live Dialogue Map"
         >
@@ -360,7 +359,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportMapAsSvg(session);
+                    void loadExport().then((m) => m.exportMapAsSvg(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -370,7 +369,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportMapAsMarkdown(session);
+                    void loadExport().then((m) => m.exportMapAsMarkdown(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -380,7 +379,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportSessionAsJson(session);
+                    void loadExport().then((m) => m.exportSessionAsJson(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -395,6 +394,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenSettings}
+          {...preloadOnIntent("settings")}
           className="p-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition"
           title="Speech models (Nemotron 3 / Parakeet) & Dialogue Mapper settings"
         >

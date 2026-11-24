@@ -1,17 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  computeConklinStats,
-  IBIS_NODE_META,
   type DialogueSession,
   type HostContextCategory,
   type IBISNodeType,
   type TranscriptTurn,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
+import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
 import { api, ApiError, type SessionSummary } from "@/lib/api";
-import {
-  startLiveMicCapture,
-  type LiveMicController,
-} from "@/lib/audio-capture";
+import type { LiveMicController } from "@/lib/audio-capture";
 import { TopBar } from "@/components/TopBar";
 import {
   ConklinMetrics,
@@ -21,11 +17,12 @@ import { HostContextBar } from "@/components/HostContextBar";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { DialogueMapCanvas } from "@/components/DialogueMapCanvas";
 import { NodeInspector } from "@/components/NodeInspector";
-import { AgentModal } from "@/components/AgentModal";
-import { SettingsModal } from "@/components/SettingsModal";
-import { YouTubeModal } from "@/components/YouTubeModal";
+import { AgentModal, SettingsModal, YouTubeModal } from "@/components/panels";
+import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
 
 export function App() {
+  const [url, setUrl] = useUrlState();
+
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [session, setSession] = useState<DialogueSession | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -48,9 +45,6 @@ export function App() {
   const [mapperMessage, setMapperMessage] = useState<string | undefined>();
   const [toastError, setToastError] = useState<string | null>(null);
 
-  const [showAgentModal, setShowAgentModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showYouTubeModal, setShowYouTubeModal] = useState(false);
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{ sec: number; nonce: number } | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
@@ -88,9 +82,7 @@ export function App() {
     void (async () => {
       try {
         const list = await refreshSessionsList();
-        const urlId = new URLSearchParams(window.location.search).get(
-          "session"
-        );
+        const urlId = new URLSearchParams(window.location.search).get("session");
         const targetId =
           (urlId && list.find((s) => s.id === urlId)?.id) || list[0]?.id;
 
@@ -121,12 +113,26 @@ export function App() {
     };
   }, [refreshSessionsList, showError, authNonce]);
 
+  // Keep ?session= in step with the open session. Switching sessions adds a history entry,
+  // so Back/Forward move between them; the first sync (no or stale id in the URL) replaces.
+  useEffect(() => {
+    if (!session?.id || url.session === session.id) return;
+    setUrl({ session: session.id }, { replace: !url.session });
+  }, [session?.id]);
+
+  // Back/Forward (or an edited URL) changed ?session=: load that session.
+  useEffect(() => {
+    if (!session || !url.session || url.session === session.id) return;
+    void api
+      .getSession(url.session)
+      .then(({ session: loaded }) => setSession(loaded))
+      // Unknown id: point the URL back at the session that's open
+      .catch(() => setUrl({ session: session.id }, { replace: true }));
+  }, [url.session]);
+
   // Live SSE Subscription for the active session
   useEffect(() => {
     if (!session?.id) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("session", session.id);
-    window.history.replaceState({}, "", url.toString());
 
     const unsubscribe = api.subscribeToSession(session.id, (evt) => {
       switch (evt.type) {
@@ -343,6 +349,8 @@ export function App() {
 
     try {
       setIsListening(true);
+      // Mic capture (AudioWorklet + WebSocket) only loads the first time the mic is turned on.
+      const { startLiveMicCapture } = await import("@/lib/audio-capture");
       const controller = await startLiveMicCapture(session.id, {
         onLevel: setMicLevel,
         onStatus: setSpeechMessage,
@@ -640,11 +648,11 @@ export function App() {
         }
         onToggleMic={() => void handleToggleMic()}
         onUploadAudio={(f) => void handleUploadAudio(f)}
-        onOpenYouTubeModal={() => setShowYouTubeModal(true)}
+        onOpenYouTubeModal={() => openPanel("youtube")}
         onStopTranscribing={() => void api.stopTranscription(session.id)}
         onToggleDemo={() => void handleToggleDemo()}
-        onOpenAgentModal={() => setShowAgentModal(true)}
-        onOpenSettings={() => setShowSettingsModal(true)}
+        onOpenAgentModal={() => openPanel("agent")}
+        onOpenSettings={() => openPanel("settings")}
       />
 
       <ConklinMetrics
@@ -752,7 +760,7 @@ export function App() {
             }
             onStartDemo={() => void handleToggleDemo()}
             onTriggerUpload={() => uploadInputRef.current?.click()}
-            onOpenYouTube={() => setShowYouTubeModal(true)}
+            onOpenYouTube={() => openPanel("youtube")}
           />
         </div>
 
@@ -803,33 +811,33 @@ export function App() {
         </div>
       )}
 
-      {showAgentModal && (
-        <AgentModal
-          session={session}
-          onClose={() => setShowAgentModal(false)}
-        />
-      )}
+      {/* Panels load on demand (see components/panels.tsx) */}
+      <Suspense fallback={null}>
+        {url.panel === "agent" && (
+          <AgentModal session={session} onClose={closePanel} />
+        )}
 
-      {showSettingsModal && (
-        <SettingsModal
-          session={session}
-          onClose={() => setShowSettingsModal(false)}
-          onUpdateSpeechConfig={async (patch) => {
-            const { session: updated } = await api.updateSession(session.id, {
-              speechConfig: patch,
-            });
-            setSession(updated);
-          }}
-        />
-      )}
+        {url.panel === "settings" && (
+          <SettingsModal
+            session={session}
+            onClose={closePanel}
+            onUpdateSpeechConfig={async (patch) => {
+              const { session: updated } = await api.updateSession(session.id, {
+                speechConfig: patch,
+              });
+              setSession(updated);
+            }}
+          />
+        )}
 
-      {showYouTubeModal && (
-        <YouTubeModal
-          session={session}
-          onClose={() => setShowYouTubeModal(false)}
-          onStartImport={(params) => handleImportYouTube(params)}
-        />
-      )}
+        {url.panel === "youtube" && (
+          <YouTubeModal
+            session={session}
+            onClose={closePanel}
+            onStartImport={(params) => handleImportYouTube(params)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

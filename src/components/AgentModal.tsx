@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { Bot, Check, Copy, Terminal, X } from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import Bot from "lucide-react/icons/bot";
+import Check from "lucide-react/icons/check";
+import Copy from "lucide-react/icons/copy";
+import Terminal from "lucide-react/icons/terminal";
+import X from "lucide-react/icons/x";
+import type { DialogueSession } from "@shared/schemas/models";
 
 interface AgentModalProps {
   session: DialogueSession;
@@ -34,18 +38,19 @@ export function AgentModal({ session, onClose }: AgentModalProps) {
     ]
   }'`;
 
-  const cliCommands = `# 1. Transcribe & diarize local audio into this live session:
-DIALOGGER_URL=${origin} pnpm cli transcribe /path/to/meeting.wav --session ${session.id} --asr parakeet-tdt --diar nemotron-3-diarization
+  const apiDocs = `# Interactive API docs (try every endpoint in the browser):
+${origin}/_swagger
 
-# 2. Read current diarized transcript + IBIS map state:
-DIALOGGER_URL=${origin} pnpm cli state ${session.id}
+# Machine-readable OpenAPI spec for agents and client generators:
+curl -sS ${origin}/_openapi.json
 
-# 3. Push live Conklin IBIS map operations:
-DIALOGGER_URL=${origin} pnpm cli op ${session.id} --json '{"actor":"agent","ops":[{"op":"add_node","type":"question","label":"What criteria decide our rollout?","parentId":null}]}'`;
+# Read current diarized transcript + IBIS map state:
+curl -sS ${origin}/api/sessions/${session.id}`;
 
   const agentPrompt = `You are driving a live Jeffrey Conklin Dialogue Map in Dialogger.
 Live Viewer URL: ${origin}/?session=${session.id}
 Session ID: ${session.id}
+Full API spec (OpenAPI 3.1): ${origin}/_openapi.json
 
 Workflow:
 1. If given an audio file, upload it to transcribe & diarize locally with NVIDIA Parakeet TDT v3 + Nemotron 3 Diarization:
@@ -129,11 +134,11 @@ Workflow:
           />
 
           <CodeBlock
-            title="3. Dialogger CLI Shortcuts"
+            title="3. API Reference (Swagger UI + OpenAPI)"
             icon={<Terminal className="w-3.5 h-3.5 text-stone-400" />}
-            code={cliCommands}
-            copied={copiedKey === "cli"}
-            onCopy={() => copy("cli", cliCommands)}
+            code={apiDocs}
+            copied={copiedKey === "api"}
+            onCopy={() => copy("api", apiDocs)}
           />
         </div>
       </div>

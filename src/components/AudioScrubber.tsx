@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Pause,
-  Play,
-  Volume2,
-  VolumeX,
-  ZoomIn,
-} from "lucide-react";
+import Pause from "lucide-react/icons/pause";
+import Play from "lucide-react/icons/play";
+import Volume2 from "lucide-react/icons/volume-2";
+import VolumeX from "lucide-react/icons/volume-x";
+import ZoomIn from "lucide-react/icons/zoom-in";
 
 interface AudioScrubberProps {
   src: string;

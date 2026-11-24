@@ -1,9 +1,7 @@
-import {
-  IBIS_NODE_META,
-  type DialogueSession,
-  type IBISNode,
-} from "@shared/ibis";
+import { type DialogueSession, type IBISNode } from "@shared/schemas/models";
+import { IBIS_NODE_META } from "@shared/ibis";
 import { computeDialogueMapLayout } from "./layout";
+import { formatTime } from "./format";
 
 function escapeXml(str: string): string {
   return str
@@ -195,11 +193,4 @@ export function exportSessionAsJson(session: DialogueSession): void {
     new Blob([JSON.stringify(session, null, 2)], { type: "application/json" }),
     `${slug(session.title)}.json`
   );
-}
-
-export function formatTime(sec: number): string {
-  const s = Math.max(0, Math.floor(sec));
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  return `${m}:${String(rem).padStart(2, "0")}`;
 }

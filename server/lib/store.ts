@@ -2,8 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import {
-  defaultRelationLabel,
-  SPEAKER_PALETTE,
   type DialogueSession,
   type HostContextItem,
   type IBISNode,
@@ -12,8 +10,9 @@ import {
   type SessionAudioMeta,
   type Speaker,
   type TranscriptTurn,
-} from "../shared/ibis";
-import type { SessionSSEEvent } from "../shared/events";
+} from "../../shared/schemas/models";
+import { defaultRelationLabel, SPEAKER_PALETTE } from "../../shared/ibis";
+import type { SessionSSEEvent } from "../../shared/schemas/events";
 
 type Listener = (event: SessionSSEEvent) => void;
 

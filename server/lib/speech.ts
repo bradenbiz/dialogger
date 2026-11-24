@@ -4,9 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import WebSocket from "ws";
-import type { WordTiming } from "../shared/ibis";
-import type { SpeechEngineStatus } from "../shared/events";
+import type { WordTiming } from "../../shared/schemas/models";
+import type { SpeechEngineStatus } from "../../shared/schemas/events";
 import {
   readPcm16FromWav,
   voiceBank,
@@ -846,10 +845,10 @@ class LocalSpeechEngine {
           }
           options.signal?.addEventListener("abort", onAbort, { once: true });
 
-          ws.on("error", (err) =>
-            finish(err instanceof Error ? err : new Error(String(err)))
+          ws.addEventListener("error", () =>
+            finish(new Error("Connection to the local speech runtime failed"))
           );
-          ws.on("close", () => finish());
+          ws.addEventListener("close", () => finish());
 
           const computePcm16Rms = (chunk: Buffer): number => {
             const samples = Math.floor(chunk.length / 2);
@@ -880,7 +879,7 @@ class LocalSpeechEngine {
             });
           };
 
-          ws.on("message", (raw) => {
+          ws.addEventListener("message", ({ data: raw }) => {
             if (finished) return;
             let evt: {
               type?: string;

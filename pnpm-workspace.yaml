@@ -1,2 +1,4 @@
 allowBuilds:
   esbuild: true
+# Fail `pnpm install` on a Node older than package.json's engines (needs the global WebSocket)
+engineStrict: true

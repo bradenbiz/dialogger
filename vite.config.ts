@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { nitro } from "nitro/vite";
 import path from "node:path";
 
-const API_PORT = Number(process.env.DIALOGGER_PORT || 4310);
+const PORT = Number(process.env.DIALOGGER_PORT || 4310);
 const DEV_HOST = process.env.DIALOGGER_HOST || "127.0.0.1";
 
 function isLoopbackHost(host: string): boolean {
@@ -30,34 +31,39 @@ export default defineConfig(({ command }) => {
   }
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      nitro({
+        serverDir: "./server",
+        features: { websocket: true },
+        experimental: { openAPI: true },
+        openAPI: {
+          meta: {
+            title: "Dialogger API",
+            description:
+              "Local diarization and live Conklin IBIS dialogue mapping. Send `Authorization: Bearer <DIALOGGER_API_KEY>` when an API key is configured.",
+            version: "1.0.0",
+          },
+          production: "runtime",
+          ui: { swagger: { route: "/_swagger" }, scalar: false },
+        },
+      }),
+    ],
     resolve: {
       alias: {
-        "@shared": path.resolve(__dirname, "shared"),
-        "@": path.resolve(__dirname, "src"),
+        "@shared": path.resolve(import.meta.dirname, "shared"),
+        "@": path.resolve(import.meta.dirname, "src"),
       },
     },
     server: {
       host: DEV_HOST,
-      port: 4311,
+      port: PORT,
+      strictPort: true,
       allowedHosts: ["malta", ".tail6771a0.ts.net"],
       fs: {
         deny: [".dialogger-data", "**/.dialogger-data/**", ".env", ".env.*"],
       },
-      proxy: {
-        "/api": {
-          target: `http://127.0.0.1:${API_PORT}`,
-          changeOrigin: true,
-        },
-        "/ws": {
-          target: `ws://127.0.0.1:${API_PORT}`,
-          ws: true,
-        },
-      },
-    },
-    build: {
-      outDir: "dist/client",
-      emptyOutDir: true,
     },
   };
 });
