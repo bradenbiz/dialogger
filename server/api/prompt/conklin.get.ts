@@ -1,0 +1,24 @@
+import { defineHandler, defineRouteMeta } from "nitro";
+import { CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT } from "../../prompt";
+
+defineRouteMeta({
+  openAPI: {
+    tags: ["Mapper"], summary: "Conklin dialogue mapping system prompt and key endpoints for agents",
+  },
+});
+
+export default defineHandler(() => ({
+  methodology: "Jeffrey Conklin's Dialogue Mapping (IBIS)",
+  systemPrompt: CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT,
+  openApi: "/_openapi.json",
+  swaggerUi: "/_swagger",
+  endpoints: {
+    createSession: "POST /api/sessions",
+    getSession: "GET /api/sessions/:id",
+    liveEventsSSE: "GET /api/sessions/:id/events",
+    transcribeFile: "POST /api/sessions/:id/transcribe",
+    appendTurns: "POST /api/sessions/:id/turns",
+    applyMapOps: "POST /api/sessions/:id/map/ops",
+    analyzeTurns: "POST /api/sessions/:id/map/analyze",
+  },
+}));

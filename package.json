@@ -4,44 +4,33 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "dialogger": "./bin/dialogger-cli.ts"
-  },
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:web\"",
-    "dev:server": "tsx watch server/index.ts",
-    "dev:web": "vite",
+    "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
-    "cli": "tsx bin/dialogger-cli.ts",
+    "start": "NITRO_HOST=${DIALOGGER_HOST:-127.0.0.1} NITRO_PORT=${DIALOGGER_PORT:-4310} node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "d3-hierarchy": "^3.1.2",
-    "express": "^5.1.0",
     "lucide-react": "^0.511.0",
-    "multer": "^2.0.0",
+    "nitro": "3.0.261103-rc",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ws": "^8.18.2",
     "zod": "^3.25.32"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.7",
+    "@tailwindcss/vite": "^4.3.5",
     "@types/d3-hierarchy": "^3.1.7",
-    "@types/express": "^5.0.2",
-    "@types/multer": "^1.4.12",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^4.5.0",
-    "concurrently": "^9.1.2",
-    "tailwindcss": "^4.1.7",
-    "tsx": "^4.19.4",
+    "@vitejs/plugin-react": "^6.3.0",
+    "tailwindcss": "^4.3.5",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "vitest": "^3.1.4"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }

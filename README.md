@@ -57,20 +57,23 @@ These must be on the `PATH` of the process running the Dialogger server. Restart
 
 ### 2. Run Dialogger
 
+Dialogger is a single [Nitro](https://nitro.build) v3 app served through Vite. The web UI, REST API, SSE stream, and live-mic WebSocket all run on one port.
+
 ```bash
 pnpm install
+pnpm dev
+```
+
+For production:
+
+```bash
 pnpm build
 pnpm start
 ```
 
-Or run with hot reload during development:
-
-```bash
-pnpm dev
-```
-
-- Single-port production server: `http://127.0.0.1:4310` (loopback by default; set `DIALOGGER_HOST=0.0.0.0` with `DIALOGGER_API_KEY` for network access)
-- Vite dev server: `http://localhost:4311` (proxies `/api` and `/ws` to `:4310`)
+- Both `pnpm dev` and `pnpm start` serve on `http://127.0.0.1:4310`. Change it with `DIALOGGER_PORT`.
+- It binds to loopback by default. For network access, set `DIALOGGER_HOST=0.0.0.0` together with `DIALOGGER_API_KEY`.
+- Interactive API docs (Swagger UI): `http://127.0.0.1:4310/_swagger`. The raw OpenAPI spec is at `/_openapi.json`.
 
 ### 3. Optional LLM Dialogue Mapper (with 1Password)
 
@@ -82,23 +85,25 @@ op run --env-file .env.1password -- pnpm start
 
 ## Driving Dialogger from an Agent or Model
 
-Any external agent (Claude Code, Codex, Antigravity, custom script) can transcribe/diarize audio locally and stream live IBIS Dialogue Map updates to any open browser tab:
+Any external agent (Claude Code, Codex, a custom script) can transcribe and diarize audio locally and stream live IBIS Dialogue Map updates to every open browser tab, using the HTTP API. Browse and try every endpoint in Swagger UI at `/_swagger`. Point agents at `/_openapi.json` for the machine-readable spec.
 
 ```bash
-# Create a live session (prints sessionId and live viewer URL)
-pnpm cli create --title "Architecture Review"
+# Create a live session
+curl -X POST http://127.0.0.1:4310/api/sessions \
+  -H 'content-type: application/json' -d '{"title": "Architecture Review"}'
 
 # Transcribe & diarize a local audio file with Parakeet TDT v3 + Nemotron 3 Diarization
-pnpm cli transcribe ./meeting.wav --session <sessionId> --asr parakeet-tdt --diar nemotron-3-diarization
+curl -X POST http://127.0.0.1:4310/api/sessions/<sessionId>/transcribe \
+  -F file=@meeting.wav -F asrModel=parakeet-tdt
 
-# Or import a public YouTube video (optional --start / --duration clip in seconds)
-pnpm cli youtube "https://www.youtube.com/watch?v=..." --session <sessionId> --duration 120
+# Or import a public YouTube video (optional startSec / durationSec clip)
+curl -X POST http://127.0.0.1:4310/api/sessions/<sessionId>/youtube \
+  -H 'content-type: application/json' \
+  -d '{"url": "https://www.youtube.com/watch?v=...", "durationSec": 120}'
 
-# Read current diarized transcript & IBIS map state
-pnpm cli state <sessionId>
-
-# Push live Conklin IBIS operations (browsers update instantaneously via SSE)
-pnpm cli op <sessionId> --json '{
+# Push live Conklin IBIS operations (browsers update instantly via SSE)
+curl -X POST http://127.0.0.1:4310/api/sessions/<sessionId>/map/ops \
+  -H 'content-type: application/json' -d '{
   "actor": "agent",
   "summary": "Captured core question and initial proposal",
   "ops": [
@@ -108,15 +113,14 @@ pnpm cli op <sessionId> --json '{
 }'
 ```
 
-Or use the HTTP + SSE API directly:
-- `GET /api/prompt/conklin` — Fetch the exact Jeffrey Conklin Dialogue Mapping prompt & schema
-- `POST /api/sessions` — Create session
-- `GET /api/sessions/:id` — Read full session JSON
+When `DIALOGGER_API_KEY` is set, add `-H 'Authorization: Bearer <key>'` to each request.
+
+Key endpoints:
+- `GET /api/prompt/conklin` — The exact Jeffrey Conklin Dialogue Mapping prompt and schema
+- `GET /api/sessions/:id` — Full session JSON (transcript + map)
 - `GET /api/sessions/:id/events` — Real-time SSE stream
-- `POST /api/sessions/:id/transcribe` — Transcribe + diarize uploaded multipart audio (`file` field)
 - `POST /api/sessions/:id/turns` — Append diarized speaker turns
-- `POST /api/sessions/:id/map/ops` — Apply incremental IBIS map operations
-- `POST /api/sessions/:id/map/analyze` — Trigger built-in Conklin mapper on unmapped turns
+- `POST /api/sessions/:id/map/analyze` — Run the built-in Conklin mapper on unmapped turns
 - `WS /ws/sessions/:id/live` — Stream 16 kHz mono PCM16 audio frames to local `nemo-speech serve`
 
 ## License
