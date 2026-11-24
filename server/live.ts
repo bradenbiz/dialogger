@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import WebSocket from "ws";
 import type { WebSocketPeer as Peer } from "nitro/h3";
 import type { WordTiming } from "../shared/schemas/models";
 import { createDiarizationWindowContext, sessionStore } from "./store";
@@ -196,7 +195,7 @@ export function startLiveAudioSession(
 
       upstream = new WebSocket(speechEngine.serverWsUrl);
 
-      upstream.on("open", () => {
+      upstream.addEventListener("open", () => {
         sendClient({ type: "live.ready", message: "Connected to local NVIDIA speech runtime" });
         sessionStore.broadcast(sessionId, {
           type: "speech.status",
@@ -205,7 +204,7 @@ export function startLiveAudioSession(
         });
       });
 
-      upstream.on("message", (raw) => {
+      upstream.addEventListener("message", ({ data: raw }) => {
         try {
           const evt = JSON.parse(raw.toString()) as {
             type?: string;
@@ -428,16 +427,17 @@ export function startLiveAudioSession(
         }
       });
 
-      upstream.on("error", (err) => {
-        sendClient({ type: "live.error", message: err.message });
+      upstream.addEventListener("error", () => {
+        const message = "Connection to the local speech runtime failed";
+        sendClient({ type: "live.error", message });
         sessionStore.broadcast(sessionId, {
           type: "speech.status",
           state: "error",
-          message: err.message,
+          message,
         });
       });
 
-      upstream.on("close", () => {
+      upstream.addEventListener("close", () => {
         if (!closed && clientWs.isOpen()) {
           clientWs.close();
         }
