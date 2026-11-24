@@ -9,6 +9,14 @@ import {
 import { sessionStore } from "../lib/store";
 
 export default definePlugin(() => {
+  // The speech runtime and live mic use Node's global WebSocket (stable since Node 22.4)
+  if (typeof globalThis.WebSocket !== "function") {
+    console.error(
+      `[dialogger] Node ${process.version} has no global WebSocket. Dialogger needs Node 22.4 or later.`
+    );
+    process.exit(1);
+  }
+
   // Refuse to expose an unauthenticated server on non-loopback interfaces unless explicitly opted in (S1)
   if (!isLoopbackHost(HOST) && !API_KEY && !OWNER_KEY && !ALLOW_UNAUTHENTICATED) {
     console.error(

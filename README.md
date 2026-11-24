@@ -59,6 +59,8 @@ These must be on the `PATH` of the process running the Dialogger server. Restart
 
 Dialogger is a single [Nitro](https://nitro.build) v3 app served through Vite. The web UI, REST API, SSE stream, and live-mic WebSocket all run on one port.
 
+It needs **Node.js 22.4 or later**, which ships the global `WebSocket` the server uses. `pnpm install` stops with an error on older versions.
+
 ```bash
 pnpm install
 pnpm dev
