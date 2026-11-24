@@ -464,205 +464,238 @@ export function App() {
   }
 
   return (
-    <div
-      className={`w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6] transition-opacity ${
-        isSwitching ? "opacity-60 pointer-events-none" : ""
-      }`}
-      aria-busy={isSwitching}
-    >
-      {/* Hidden input for empty-state upload CTA */}
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept="audio/*,video/*,.wav,.mp3,.m4a,.ogg,.flac,.webm,.mp4"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleUploadAudio(f);
-          e.target.value = "";
-        }}
-      />
+    <>
+      {/* While switching, the previous session is still on screen: inert blocks mouse and
+          keyboard so no action runs against it. The toast stays outside, so it can be dismissed. */}
+      <div
+        className={`w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6] transition-opacity ${
+          isSwitching ? "opacity-60" : ""
+        }`}
+        inert={isSwitching}
+        aria-busy={isSwitching}
+      >
+        {/* Hidden input for empty-state upload CTA */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="audio/*,video/*,.wav,.mp3,.m4a,.ogg,.flac,.webm,.mp4"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleUploadAudio(f);
+            e.target.value = "";
+          }}
+        />
 
-      <TopBar
-        session={session}
-        sessions={sessions}
-        isListening={isListening}
-        micLevel={micLevel}
-        isTranscribing={isTranscribing}
-        isDemoRunning={isDemoRunning}
-        speechMessage={speechMessage}
-        mapperBusy={mapperBusy}
-        mapperMessage={mapperMessage}
-        onSelectSession={(id) => void handleSelectSession(id)}
-        onCreateSession={() => void handleCreateSession()}
-        onDeleteSession={(id) => void handleDeleteSession(id)}
-        onRenameSession={(title) => {
-          if (session) void api.updateSession(session.id, { title });
-        }}
-        onToggleMic={() => void handleToggleMic()}
-        onUploadAudio={(f) => void handleUploadAudio(f)}
-        onOpenYouTubeModal={() => openPanel("youtube")}
-        onStopTranscribing={() => {
-          if (session) void api.stopTranscription(session.id);
-        }}
-        onToggleDemo={() => void handleToggleDemo()}
-        onOpenAgentModal={() => openPanel("agent")}
-        onOpenSettings={() => openPanel("settings")}
-      />
+        <TopBar
+          session={session}
+          sessions={sessions}
+          isListening={isListening}
+          micLevel={micLevel}
+          isTranscribing={isTranscribing}
+          isDemoRunning={isDemoRunning}
+          speechMessage={speechMessage}
+          mapperBusy={mapperBusy}
+          mapperMessage={mapperMessage}
+          onSelectSession={(id) => void handleSelectSession(id)}
+          onCreateSession={() => void handleCreateSession()}
+          onDeleteSession={(id) => void handleDeleteSession(id)}
+          onRenameSession={(title) => {
+            if (session) void api.updateSession(session.id, { title });
+          }}
+          onToggleMic={() => void handleToggleMic()}
+          onUploadAudio={(f) => void handleUploadAudio(f)}
+          onOpenYouTubeModal={() => openPanel("youtube")}
+          onStopTranscribing={() => {
+            if (session) void api.stopTranscription(session.id);
+          }}
+          onToggleDemo={() => void handleToggleDemo()}
+          onOpenAgentModal={() => openPanel("agent")}
+          onOpenSettings={() => openPanel("settings")}
+        />
 
-      <ConklinMetrics
-        stats={stats}
-        lens={lens}
-        onChangeLens={(next) => {
-          setLens(next);
-          setHighlightedNodeIds(new Set());
-        }}
-        onHighlightNodes={(ids) => {
-          setHighlightedNodeIds(new Set(ids));
-          if (ids[0]) setSelectedNodeId(ids[0]);
-        }}
-      />
+        <ConklinMetrics
+          stats={stats}
+          lens={lens}
+          onChangeLens={(next) => {
+            setLens(next);
+            setHighlightedNodeIds(new Set());
+          }}
+          onHighlightNodes={(ids) => {
+            setHighlightedNodeIds(new Set(ids));
+            if (ids[0]) setSelectedNodeId(ids[0]);
+          }}
+        />
 
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        {session ? (
-          <TranscriptPanel
-            session={session}
-            partialText={partialText}
-            highlightedTurnIds={highlightedTurnIds}
-            playingTurnId={playingTurnId}
-            seekRequest={seekRequest}
-            activeSpeakerFilter={activeSpeakerFilter}
-            mapperBusy={mapperBusy}
-            isTranscribing={isTranscribing}
-            onAudioTimeUpdate={handleAudioTimeUpdate}
-            onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
-            onTrimAudio={async (params) => {
-              try {
-                const { session: updated } = await api.trimSessionAudio(
-                  session.id,
-                  params
-                );
-                cacheSession(updated);
-                setSelectedNodeId(null);
-                setHighlightedNodeIds(new Set());
-                await invalidateSessions();
-              } catch (err) {
-                showError(err instanceof Error ? err.message : String(err));
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {session ? (
+            <TranscriptPanel
+              session={session}
+              partialText={partialText}
+              highlightedTurnIds={highlightedTurnIds}
+              playingTurnId={playingTurnId}
+              seekRequest={seekRequest}
+              activeSpeakerFilter={activeSpeakerFilter}
+              mapperBusy={mapperBusy}
+              isTranscribing={isTranscribing}
+              onAudioTimeUpdate={handleAudioTimeUpdate}
+              onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
+              onTrimAudio={async (params) => {
+                try {
+                  const { session: updated } = await api.trimSessionAudio(
+                    session.id,
+                    params
+                  );
+                  cacheSession(updated);
+                  setSelectedNodeId(null);
+                  setHighlightedNodeIds(new Set());
+                  await invalidateSessions();
+                } catch (err) {
+                  showError(err instanceof Error ? err.message : String(err));
+                }
+              }}
+              onStopTranscribing={() => void api.stopTranscription(session.id)}
+              onSelectTurn={handleSelectTurn}
+              onReassignTurnSpeaker={(turnId, patch) =>
+                void api.updateTurnSpeaker(session.id, turnId, patch)
               }
-            }}
-            onStopTranscribing={() => void api.stopTranscription(session.id)}
-            onSelectTurn={handleSelectTurn}
-            onReassignTurnSpeaker={(turnId, patch) =>
-              void api.updateTurnSpeaker(session.id, turnId, patch)
-            }
-            onFilterSpeaker={(spkId) => {
-              setActiveSpeakerFilter(spkId);
-              setHighlightedNodeIds(new Set());
-            }}
-            onRenameSpeaker={(spkId, name) =>
-              void api.renameSpeaker(session.id, spkId, name)
-            }
-            onSubmitManualTurn={async (speakerChannel, text) => {
-              await api.addTurn(
-                session.id,
-                { speakerChannel, text, source: "manual" },
-                session.autoMap
-              );
-            }}
-            onToggleAutoMap={(autoMap) =>
-              void api.updateSession(session.id, { autoMap })
-            }
-            onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
-            onDropAudioFile={(f) => void handleUploadAudio(f)}
-          />
-        ) : (
-          <TranscriptPanelSkeleton />
-        )}
+              onFilterSpeaker={(spkId) => {
+                setActiveSpeakerFilter(spkId);
+                setHighlightedNodeIds(new Set());
+              }}
+              onRenameSpeaker={(spkId, name) =>
+                void api.renameSpeaker(session.id, spkId, name)
+              }
+              onSubmitManualTurn={async (speakerChannel, text) => {
+                await api.addTurn(
+                  session.id,
+                  { speakerChannel, text, source: "manual" },
+                  session.autoMap
+                );
+              }}
+              onToggleAutoMap={(autoMap) =>
+                void api.updateSession(session.id, { autoMap })
+              }
+              onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
+              onDropAudioFile={(f) => void handleUploadAudio(f)}
+            />
+          ) : (
+            <TranscriptPanelSkeleton />
+          )}
 
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          <HostContextBar
-            items={session?.hostContext}
-            speakers={session?.speakers}
-            onAddContext={(category: HostContextCategory, summary: string) => {
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+            <HostContextBar
+              items={session?.hostContext}
+              speakers={session?.speakers}
+              onAddContext={(category: HostContextCategory, summary: string) => {
+                if (!session) return;
+                void api.applyMapOps(session.id, {
+                  actor: "human",
+                  summary: `Added session ${category.replace(/_/g, " ")} context`,
+                  ops: [{ op: "add_host_context", category, summary }],
+                });
+              }}
+              onRemoveContext={(id: string) => {
+                if (!session) return;
+                void api.applyMapOps(session.id, {
+                  actor: "human",
+                  ops: [{ op: "remove_host_context", id }],
+                });
+              }}
+              onFocusTurn={(turnId) => {
+                const turn = session?.turns.find((t) => t.id === turnId);
+                if (turn) handleSelectTurn(turn);
+              }}
+            />
+
+            {session && stats ? (
+              <DialogueMapCanvas
+                session={session}
+                stats={stats}
+                lens={lens}
+                activeSpeakerFilter={activeSpeakerFilter}
+                selectedNodeId={selectedNodeId}
+                highlightedNodeIds={highlightedNodeIds}
+                recentNodeIds={recentNodeIds}
+                onSelectNode={(id) => {
+                  setSelectedNodeId(id);
+                  if (!id) setHighlightedNodeIds(new Set());
+                }}
+                onQuickAddChild={(parentId, type) =>
+                  void handleQuickAddChild(parentId, type)
+                }
+                onStartDemo={() => void handleToggleDemo()}
+                onTriggerUpload={() => uploadInputRef.current?.click()}
+                onOpenYouTube={() => openPanel("youtube")}
+              />
+            ) : (
+              <DialogueMapCanvasPlaceholder />
+            )}
+          </div>
+
+          <NodeInspector
+            session={session}
+            selectedNode={selectedNode}
+            onClose={() => setSelectedNodeId(null)}
+            onUpdateNode={(id, patch) => {
               if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
-                summary: `Added session ${category.replace(/_/g, " ")} context`,
-                ops: [{ op: "add_host_context", category, summary }],
+                ops: [{ op: "update_node", id, ...patch }],
               });
             }}
-            onRemoveContext={(id: string) => {
+            onDeleteNode={(id) => {
+              setSelectedNodeId(null);
               if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
-                ops: [{ op: "remove_host_context", id }],
+                summary: "Removed node branch",
+                ops: [{ op: "delete_node", id, cascade: true }],
+              });
+            }}
+            onAddChild={(parentId, type, label) => {
+              if (!session) return;
+              void api.applyMapOps(session.id, {
+                actor: "human",
+                summary: `Added ${IBIS_NODE_META[type].shortName} node`,
+                ops: [{ op: "add_node", parentId, type, label }],
               });
             }}
             onFocusTurn={(turnId) => {
               const turn = session?.turns.find((t) => t.id === turnId);
               if (turn) handleSelectTurn(turn);
             }}
+            onSelectNode={(id) => setSelectedNodeId(id)}
           />
-
-          {session && stats ? (
-            <DialogueMapCanvas
-              session={session}
-              stats={stats}
-              lens={lens}
-              activeSpeakerFilter={activeSpeakerFilter}
-              selectedNodeId={selectedNodeId}
-              highlightedNodeIds={highlightedNodeIds}
-              recentNodeIds={recentNodeIds}
-              onSelectNode={(id) => {
-                setSelectedNodeId(id);
-                if (!id) setHighlightedNodeIds(new Set());
-              }}
-              onQuickAddChild={(parentId, type) =>
-                void handleQuickAddChild(parentId, type)
-              }
-              onStartDemo={() => void handleToggleDemo()}
-              onTriggerUpload={() => uploadInputRef.current?.click()}
-              onOpenYouTube={() => openPanel("youtube")}
-            />
-          ) : (
-            <DialogueMapCanvasPlaceholder />
-          )}
         </div>
 
-        <NodeInspector
-          session={session}
-          selectedNode={selectedNode}
-          onClose={() => setSelectedNodeId(null)}
-          onUpdateNode={(id, patch) => {
-            if (!session) return;
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              ops: [{ op: "update_node", id, ...patch }],
-            });
-          }}
-          onDeleteNode={(id) => {
-            setSelectedNodeId(null);
-            if (!session) return;
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              summary: "Removed node branch",
-              ops: [{ op: "delete_node", id, cascade: true }],
-            });
-          }}
-          onAddChild={(parentId, type, label) => {
-            if (!session) return;
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              summary: `Added ${IBIS_NODE_META[type].shortName} node`,
-              ops: [{ op: "add_node", parentId, type, label }],
-            });
-          }}
-          onFocusTurn={(turnId) => {
-            const turn = session?.turns.find((t) => t.id === turnId);
-            if (turn) handleSelectTurn(turn);
-          }}
-          onSelectNode={(id) => setSelectedNodeId(id)}
-        />
+        {/* Panels load on demand (see components/panels.tsx) */}
+        <Suspense fallback={null}>
+          {session && url.panel === "agent" && (
+            <AgentModal session={session} onClose={closePanel} />
+          )}
+
+          {session && url.panel === "settings" && (
+            <SettingsModal
+              session={session}
+              onClose={closePanel}
+              onUpdateSpeechConfig={async (patch) => {
+                const { session: updated } = await api.updateSession(session.id, {
+                  speechConfig: patch,
+                });
+                cacheSession(updated);
+              }}
+            />
+          )}
+
+          {session && url.panel === "youtube" && (
+            <YouTubeModal
+              session={session}
+              onClose={closePanel}
+              onStartImport={(params) => handleImportYouTube(params)}
+            />
+          )}
+        </Suspense>
       </div>
 
       {/* Error Toast */}
@@ -673,39 +706,12 @@ export function App() {
             type="button"
             onClick={() => setToastError(null)}
             className="text-rose-300 hover:text-white font-bold"
+            aria-label="Dismiss error"
           >
             ✕
           </button>
         </div>
       )}
-
-      {/* Panels load on demand (see components/panels.tsx) */}
-      <Suspense fallback={null}>
-        {session && url.panel === "agent" && (
-          <AgentModal session={session} onClose={closePanel} />
-        )}
-
-        {session && url.panel === "settings" && (
-          <SettingsModal
-            session={session}
-            onClose={closePanel}
-            onUpdateSpeechConfig={async (patch) => {
-              const { session: updated } = await api.updateSession(session.id, {
-                speechConfig: patch,
-              });
-              cacheSession(updated);
-            }}
-          />
-        )}
-
-        {session && url.panel === "youtube" && (
-          <YouTubeModal
-            session={session}
-            onClose={closePanel}
-            onStartImport={(params) => handleImportYouTube(params)}
-          />
-        )}
-      </Suspense>
-    </div>
+    </>
   );
 }
