@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import useSWRMutation from "swr/mutation";
 import CheckCircle2 from "lucide-react/icons/circle-check";
 import Cpu from "lucide-react/icons/cpu";
 import Fingerprint from "lucide-react/icons/fingerprint-pattern";
@@ -12,13 +12,7 @@ import XCircle from "lucide-react/icons/circle-x";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { MapperConfigInfo } from "@shared/schemas/events";
 import { api } from "@/lib/api";
-import {
-  queryClient,
-  queryKeys,
-  useMapperConfigQuery,
-  useSpeechStatusQuery,
-  useVoicesQuery,
-} from "@/lib/queries";
+import { keys, useMapperConfig, useSpeechStatus, useVoices } from "@/lib/queries";
 
 interface SettingsModalProps {
   session: DialogueSession;
@@ -33,9 +27,9 @@ export function SettingsModal({
   onClose,
   onUpdateSpeechConfig,
 }: SettingsModalProps) {
-  const speechStatusQuery = useSpeechStatusQuery();
-  const mapperConfigQuery = useMapperConfigQuery();
-  const voicesQuery = useVoicesQuery();
+  const speechStatusQuery = useSpeechStatus();
+  const mapperConfigQuery = useMapperConfig();
+  const voicesQuery = useVoices();
   const speechStatus = speechStatusQuery.data ?? null;
   const mapperConfig = mapperConfigQuery.data ?? null;
   const voices = voicesQuery.data ?? [];
@@ -43,7 +37,10 @@ export function SettingsModal({
   const loadError =
     speechStatusQuery.error ?? mapperConfigQuery.error ?? voicesQuery.error;
   const error = actionError ?? (loadError ? loadError.message : null);
+  // Mutation results go straight into the matching cache entry (populateCache); errors are
+  // shown in the modal instead of thrown
   const onActionError = (err: Error) => setActionError(err.message);
+  const mutationOptions = { revalidate: false, throwOnError: false, onError: onActionError };
 
   const [mode, setMode] = useState<MapperConfigInfo["mode"]>("llm");
   const [provider, setProvider] =
@@ -63,24 +60,24 @@ export function SettingsModal({
 
   const refreshAll = () => {
     setActionError(null);
-    void speechStatusQuery.refetch();
-    void mapperConfigQuery.refetch();
-    void voicesQuery.refetch();
+    void speechStatusQuery.mutate();
+    void mapperConfigQuery.mutate();
+    void voicesQuery.mutate();
   };
 
-  const warmServer = useMutation({
-    mutationFn: () =>
+  const warmServer = useSWRMutation(
+    keys.speechStatus,
+    () =>
       api.startSpeechServer({
         asrModel: session.speechConfig.streamingAsrModel,
         diarModel: session.speechConfig.diarizationModel,
       }),
-    onMutate: () => setActionError(null),
-    onSuccess: (status) => queryClient.setQueryData(queryKeys.speechStatus, status),
-    onError: onActionError,
-  });
+    { ...mutationOptions, populateCache: true }
+  );
 
-  const saveMapper = useMutation({
-    mutationFn: () =>
+  const saveMapper = useSWRMutation(
+    keys.mapperConfig,
+    () =>
       api.updateMapperConfig({
         mode,
         provider: mode === "heuristic" ? "heuristic" : provider,
@@ -88,23 +85,19 @@ export function SettingsModal({
         model,
         apiKey: apiKey.trim() || undefined,
       }),
-    onMutate: () => setActionError(null),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.mapperConfig, updated);
-      setApiKey("");
-    },
-    onError: onActionError,
-  });
+    { ...mutationOptions, populateCache: true, onSuccess: () => setApiKey("") }
+  );
 
-  const deleteVoice = useMutation({
-    mutationFn: (id: string) => api.deleteVoice(id),
-    onSuccess: (res) => queryClient.setQueryData(queryKeys.voices, res.voices),
-    onError: onActionError,
-  });
+  const deleteVoice = useSWRMutation(
+    keys.voices,
+    (_key, { arg: id }: { arg: string }) => api.deleteVoice(id),
+    { ...mutationOptions, populateCache: (res) => res.voices }
+  );
 
   const handleSaveMapper = (e: React.FormEvent) => {
     e.preventDefault();
-    saveMapper.mutate();
+    setActionError(null);
+    void saveMapper.trigger();
   };
 
   return (
@@ -180,12 +173,15 @@ export function SettingsModal({
                   {!speechStatus.serverRunning && speechStatus.installed && (
                     <button
                       type="button"
-                      disabled={warmServer.isPending}
-                      onClick={() => warmServer.mutate()}
+                      disabled={warmServer.isMutating}
+                      onClick={() => {
+                        setActionError(null);
+                        void warmServer.trigger();
+                      }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900 text-white font-semibold hover:bg-stone-800 disabled:opacity-50"
                     >
                       <Play className="w-3 h-3 fill-current" />
-                      {warmServer.isPending ? "Starting…" : "Pre-warm Live Server"}
+                      {warmServer.isMutating ? "Starting…" : "Pre-warm Live Server"}
                     </button>
                   )}
                 </div>
@@ -434,10 +430,10 @@ export function SettingsModal({
                 </span>
                 <button
                   type="submit"
-                  disabled={saveMapper.isPending}
+                  disabled={saveMapper.isMutating}
                   className="px-3.5 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {saveMapper.isPending ? "Saving…" : "Save Mapper Config"}
+                  {saveMapper.isMutating ? "Saving…" : "Save Mapper Config"}
                 </button>
               </div>
             </form>
@@ -474,8 +470,8 @@ export function SettingsModal({
                       </div>
                       <button
                         type="button"
-                        disabled={deleteVoice.isPending}
-                        onClick={() => deleteVoice.mutate(v.id)}
+                        disabled={deleteVoice.isMutating}
+                        onClick={() => void deleteVoice.trigger(v.id)}
                         className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-50"
                         title="Remove enrolled voice"
                       >

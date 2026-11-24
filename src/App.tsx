@@ -6,16 +6,15 @@ import {
   type TranscriptTurn,
 } from "@shared/schemas/models";
 import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
-import { api, type SessionSummary } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   applySessionEvent,
   cacheSession,
   invalidateSessions,
   isUnauthorized,
-  queryClient,
-  queryKeys,
-  useSessionQuery,
-  useSessionsQuery,
+  revalidateAll,
+  useSession,
+  useSessions,
 } from "@/lib/queries";
 import type { LiveMicController } from "@/lib/audio-capture";
 import { TopBar } from "@/components/TopBar";
@@ -36,15 +35,16 @@ import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
 export function App() {
   const [url, setUrl] = useUrlState();
 
-  // Server state lives in the TanStack Query cache; the open session's live SSE stream
+  // Server state lives in the SWR cache; the open session's live SSE stream
   // writes into it (applySessionEvent), so `session` is always the cached copy.
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const sessionsQuery = useSessionsQuery();
+  const sessionsQuery = useSessions();
   const sessions = sessionsQuery.data;
-  const sessionQuery = useSessionQuery(activeSessionId);
+  const sessionQuery = useSession(activeSessionId);
   const session = sessionQuery.data;
-  // The previous session, still shown while the newly selected one loads
-  const isSwitching = sessionQuery.isPlaceholderData;
+  // Still showing the previous session while the newly selected one loads (keepPreviousData).
+  // Compared by id, not isLoading: the live stream's snapshot can fill the cache first.
+  const isSwitching = session !== undefined && session.id !== activeSessionId;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(
     new Set()
@@ -226,11 +226,8 @@ export function App() {
 
   const handleDeleteSession = async (id: string) => {
     await api.deleteSession(id);
-    queryClient.removeQueries({ queryKey: queryKeys.session(id) });
-    await invalidateSessions();
-    const remaining =
-      queryClient.getQueryData<SessionSummary[]>(queryKeys.sessions) ?? [];
-    if (session?.id === id && remaining[0]) {
+    const remaining = await invalidateSessions();
+    if (session?.id === id && remaining?.[0]) {
       await handleSelectSession(remaining[0].id);
     }
   };
@@ -465,7 +462,7 @@ export function App() {
               await api.authLogin(authTokenInput.trim());
               setAuthTokenInput("");
               // Refetch everything that failed with 401 now that the cookie is set
-              await queryClient.invalidateQueries();
+              await revalidateAll();
             } catch (err) {
               setAuthError(
                 err instanceof Error ? err.message : "Invalid access token"

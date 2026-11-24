@@ -1,77 +1,78 @@
-import { keepPreviousData, QueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
+import useSWR, { mutate, type SWRConfiguration } from "swr";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSSEEvent } from "@shared/schemas/events";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type SessionSummary } from "@/lib/api";
 
-export const queryKeys = {
+/** SWR cache keys. A `null` key (see useSession) means "nothing to fetch yet": no cache entry. */
+export const keys = {
   sessions: ["sessions"] as const,
   session: (id: string) => ["session", id] as const,
   speechStatus: ["speech", "status"] as const,
   mapperConfig: ["mapper", "config"] as const,
   voices: ["voices"] as const,
-} satisfies Record<string, QueryKey | ((...args: string[]) => QueryKey)>;
+};
 
 export function isUnauthorized(err: unknown): boolean {
   return err instanceof ApiError && err.status === 401;
 }
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Don't hammer the server with retries for auth failures or missing sessions
-      retry: (failureCount, err) =>
-        !(err instanceof ApiError && err.status < 500) && failureCount < 2,
-      staleTime: 30_000,
-    },
+/** App-wide SWR options (passed to <SWRConfig> in main.tsx). */
+export const swrConfig: SWRConfiguration = {
+  // Don't hammer the server with retries for auth failures or missing sessions
+  onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+    if (err instanceof ApiError && err.status < 500) return;
+    if (retryCount >= 2) return;
+    setTimeout(() => void revalidate({ retryCount }), 1000 * 2 ** retryCount);
   },
-});
+};
 
-export function useSessionsQuery() {
-  return useQuery({
-    queryKey: queryKeys.sessions,
-    queryFn: async () => (await api.listSessions()).sessions,
-  });
+export function useSessions() {
+  return useSWR<SessionSummary[]>(keys.sessions, async () => (await api.listSessions()).sessions);
 }
 
 /**
- * The open session. Its live SSE stream keeps this cache entry current (see
- * applySessionEvent), so it never goes stale on its own or refetches on focus.
- * While switching to a session that isn't cached yet, the previous one stays as
- * placeholder data (`isPlaceholderData`), so the screen doesn't drop back to a skeleton.
+ * The open session; `null` while none is chosen yet. Its live SSE stream keeps this cache
+ * entry current (see applySessionEvent), so it never revalidates on its own. While switching
+ * to a session that isn't cached yet, the previous one stays as `data` (keepPreviousData).
  */
-export function useSessionQuery(id: string | null) {
-  return useQuery({
-    queryKey: queryKeys.session(id ?? ""),
-    queryFn: async () => (await api.getSession(id!)).session,
-    enabled: Boolean(id),
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
-  });
+export function useSession(id: string | null) {
+  return useSWR<DialogueSession>(
+    id ? keys.session(id) : null,
+    async ([, sessionId]: readonly [string, string]) => (await api.getSession(sessionId)).session,
+    {
+      keepPreviousData: true,
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
 }
 
-export function useSpeechStatusQuery() {
-  return useQuery({ queryKey: queryKeys.speechStatus, queryFn: api.getSpeechStatus });
+export function useSpeechStatus() {
+  return useSWR(keys.speechStatus, () => api.getSpeechStatus());
 }
 
-export function useMapperConfigQuery() {
-  return useQuery({ queryKey: queryKeys.mapperConfig, queryFn: api.getMapperConfig });
+export function useMapperConfig() {
+  return useSWR(keys.mapperConfig, () => api.getMapperConfig());
 }
 
-export function useVoicesQuery() {
-  return useQuery({
-    queryKey: queryKeys.voices,
-    queryFn: async () => (await api.listVoices()).voices,
-  });
+export function useVoices() {
+  return useSWR(keys.voices, async () => (await api.listVoices()).voices);
 }
 
 /** Puts a session the server just returned into the cache. */
 export function cacheSession(session: DialogueSession): void {
-  queryClient.setQueryData(queryKeys.session(session.id), session);
+  void mutate(keys.session(session.id), session, { revalidate: false });
 }
 
-export function invalidateSessions(): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: queryKeys.sessions });
+/** Refetches the session list; resolves to the fresh list. */
+export function invalidateSessions(): Promise<SessionSummary[] | undefined> {
+  return mutate<SessionSummary[]>(keys.sessions);
+}
+
+/** Refetches everything cached (e.g. after signing in, when it all failed with 401). */
+export function revalidateAll(): Promise<unknown[]> {
+  return mutate(() => true);
 }
 
 /** Applies one live SSE event to a cached session. Pure: returns the next session. */
@@ -150,13 +151,13 @@ export function reduceSessionEvent(
 
 /** Writes a live SSE event into the cached session (and the session list when titles/counts change). */
 export function applySessionEvent(sessionId: string, evt: SessionSSEEvent): void {
-  const key = queryKeys.session(sessionId);
+  const key = keys.session(sessionId);
   if (evt.type === "session.snapshot") {
-    queryClient.setQueryData(key, evt.session);
+    void mutate(key, evt.session, { revalidate: false });
   } else {
-    queryClient.setQueryData<DialogueSession>(key, (prev) =>
-      prev ? reduceSessionEvent(prev, evt) : prev
-    );
+    void mutate<DialogueSession>(key, (prev) => (prev ? reduceSessionEvent(prev, evt) : prev), {
+      revalidate: false,
+    });
   }
   if (evt.type === "session.updated" || evt.type === "map.updated") {
     void invalidateSessions();
