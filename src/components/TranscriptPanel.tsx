@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import AudioLines from "lucide-react/icons/audio-lines";
 import Check from "lucide-react/icons/check";
 import ChevronDown from "lucide-react/icons/chevron-down";
@@ -17,8 +17,8 @@ import { lazyWithPreload } from "@/lib/lazy";
 import { preloadNodeEditor } from "@/components/panels";
 
 // The audio controls only show for sessions with audio, so they load separately from the main bundle
-const SessionAudioControls = lazy(() =>
-  import("./SessionAudioControls").then((m) => ({ default: m.SessionAudioControls }))
+const { Component: SessionAudioControls } = lazyWithPreload(() =>
+  import("./SessionAudioControls").then((m) => m.SessionAudioControls)
 );
 
 // The speaker menu only shows once a turn's speaker is clicked; it loads on hover or focus
