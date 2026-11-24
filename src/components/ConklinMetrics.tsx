@@ -1,4 +1,8 @@
-import { AlertCircle, CheckCircle2, HelpCircle, Scale, Sparkles } from "lucide-react";
+import AlertCircle from "lucide-react/icons/circle-exclamation-point";
+import CheckCircle2 from "lucide-react/icons/circle-check";
+import HelpCircle from "lucide-react/icons/circle-question-mark";
+import Scale from "lucide-react/icons/scale";
+import Sparkles from "lucide-react/icons/sparkles";
 import { type IBISNodeType } from "@shared/schemas/models";
 import { IBIS_NODE_META, type ConklinMapStats } from "@shared/ibis";
 

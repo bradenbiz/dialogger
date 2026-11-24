@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import {
-  Activity,
-  Award,
-  BookOpen,
-  MessageSquareQuote,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import Activity from "lucide-react/icons/activity";
+import Award from "lucide-react/icons/award";
+import BookOpen from "lucide-react/icons/book-open";
+import MessageSquareQuote from "lucide-react/icons/message-square-quote";
+import Plus from "lucide-react/icons/plus";
+import Trash2 from "lucide-react/icons/trash";
+import X from "lucide-react/icons/x";
 import {
   type DialogueSession,
   type IBISNode,

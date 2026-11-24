@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { Clock, Loader2, Sparkles, X, Youtube } from "lucide-react";
+import Clock from "lucide-react/icons/clock";
+import Loader2 from "lucide-react/icons/loader-circle";
+import Sparkles from "lucide-react/icons/sparkles";
+import X from "lucide-react/icons/x";
+import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import { api, type YouTubeMetadata } from "@/lib/api";
 import { formatTime } from "@/lib/export";

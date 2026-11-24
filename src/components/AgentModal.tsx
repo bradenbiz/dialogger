@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { Bot, Check, Copy, Terminal, X } from "lucide-react";
+import Bot from "lucide-react/icons/bot";
+import Check from "lucide-react/icons/check";
+import Copy from "lucide-react/icons/copy";
+import Terminal from "lucide-react/icons/terminal";
+import X from "lucide-react/icons/x";
 import type { DialogueSession } from "@shared/schemas/models";
 
 interface AgentModalProps {

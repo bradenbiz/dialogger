@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChevronRight,
-  Compass,
-  Maximize2,
-  Minus,
-  Play,
-  Plus,
-  Upload,
-  Youtube,
-} from "lucide-react";
+import ChevronRight from "lucide-react/icons/chevron-right";
+import Compass from "lucide-react/icons/compass";
+import Maximize2 from "lucide-react/icons/maximize-2";
+import Minus from "lucide-react/icons/minus";
+import Play from "lucide-react/icons/play";
+import Plus from "lucide-react/icons/plus";
+import Upload from "lucide-react/icons/upload";
+import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import {
   type DialogueSession,
   type IBISNodeType,

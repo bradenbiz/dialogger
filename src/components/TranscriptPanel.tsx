@@ -1,21 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  AudioLines,
-  Check,
-  ChevronDown,
-  Edit3,
-  ExternalLink,
-  Layers,
-  Play,
-  Plus,
-  Scissors,
-  Send,
-  Sparkles,
-  Square,
-  UploadCloud,
-  Users,
-  Volume2,
-} from "lucide-react";
+import AudioLines from "lucide-react/icons/audio-lines";
+import Check from "lucide-react/icons/check";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import Edit3 from "lucide-react/icons/pen-line";
+import ExternalLink from "lucide-react/icons/external-link";
+import Layers from "lucide-react/icons/layers";
+import Play from "lucide-react/icons/play";
+import Plus from "lucide-react/icons/plus";
+import Scissors from "lucide-react/icons/scissors";
+import Send from "lucide-react/icons/send";
+import Sparkles from "lucide-react/icons/sparkles";
+import Square from "lucide-react/icons/square";
+import UploadCloud from "lucide-react/icons/cloud-upload";
+import Users from "lucide-react/icons/users";
+import Volume2 from "lucide-react/icons/volume-2";
 import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
 import { formatTime } from "@/lib/export";
 import { AudioScrubber } from "./AudioScrubber";

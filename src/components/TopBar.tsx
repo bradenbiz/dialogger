@@ -1,19 +1,17 @@
 import { useRef, useState } from "react";
-import {
-  Bot,
-  ChevronDown,
-  Download,
-  FileAudio,
-  Mic,
-  MicOff,
-  Play,
-  Plus,
-  Settings,
-  Square,
-  Trash2,
-  Upload,
-  Youtube,
-} from "lucide-react";
+import Bot from "lucide-react/icons/bot";
+import ChevronDown from "lucide-react/icons/chevron-down";
+import Download from "lucide-react/icons/download";
+import FileAudio from "lucide-react/icons/file-headphone";
+import Mic from "lucide-react/icons/mic";
+import MicOff from "lucide-react/icons/mic-off";
+import Play from "lucide-react/icons/play";
+import Plus from "lucide-react/icons/plus";
+import Settings from "lucide-react/icons/settings";
+import Square from "lucide-react/icons/square";
+import Trash2 from "lucide-react/icons/trash";
+import Upload from "lucide-react/icons/upload";
+import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
 import {
