@@ -111,9 +111,16 @@ export function App() {
     };
   }, [activeSessionId, sessionsQuery.data, showSession, showError]);
 
+  // A failed load keeps the previous session as `data` (keepPreviousData), which would leave
+  // the switching overlay up for good: go back to the session still on screen instead.
   useEffect(() => {
-    if (sessionQuery.error && !isUnauthorized(sessionQuery.error)) {
-      showError(sessionQuery.error.message);
+    const err = sessionQuery.error;
+    if (!err || isUnauthorized(err)) return;
+    showError(err.message);
+    if (session && session.id !== activeSessionId) {
+      setUrl({ session: session.id }, { replace: true });
+      setActiveSessionId(session.id);
+      void invalidateSessions();
     }
   }, [sessionQuery.error, showError]);
 
