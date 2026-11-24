@@ -1,9 +1,9 @@
 import { defineMiddleware } from "nitro/h3";
-import { toOpenApiComponents } from "../../shared/schema-registry";
+import { toOpenApiComponents } from "../../shared/schemas/registry";
 // Importing these modules registers every named schema in the registry.
-import "../../shared/api";
-import "../../shared/events";
-import "../../shared/ibis";
+import "../../shared/schemas/contracts";
+import "../../shared/schemas/events";
+import "../../shared/schemas/models";
 
 /** Nitro's own routes that aren't part of the Dialogger API. */
 const HIDDEN_PATHS = ["/_openapi.json", "/_swagger", "/_scalar", "/_nitro/tasks/{*param1}", "/{*param1}"];

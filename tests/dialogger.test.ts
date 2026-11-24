@@ -2,14 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { computeConklinStats, type IBISNode, type TranscriptTurn } from "../shared/ibis";
+import { type IBISNode, type TranscriptTurn } from "../shared/schemas/models";
+import { computeConklinStats } from "../shared/ibis";
 import { alignWordsToDiarization, wordsToDiarizedTurns } from "../server/speech";
 import { createDiarizationWindowContext, SessionStore } from "../server/store";
 import { DialogueMapperEngine } from "../server/mapper";
 import { isValidYouTubeUrl, parseDownloadProgress } from "../server/youtube";
-import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/api";
-import "../shared/events";
-import { toOpenApiComponents } from "../shared/schema-registry";
+import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/schemas/contracts";
+import "../shared/schemas/events";
+import { toOpenApiComponents } from "../shared/schemas/registry";
 
 let testDataDir: string;
 

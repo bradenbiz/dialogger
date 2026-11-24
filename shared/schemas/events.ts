@@ -8,8 +8,8 @@ import {
   SessionAudioMetaSchema,
   SpeakerSchema,
   TranscriptTurnSchema,
-} from "./ibis";
-import { named } from "./schema-registry";
+} from "./models";
+import { named } from "./registry";
 
 /** Events pushed over `GET /api/sessions/:id/events` (each SSE `data:` line is one of these). */
 export const SessionSSEEventSchema = named(

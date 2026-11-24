@@ -26,15 +26,15 @@ import type {
   YouTubeImportRequest,
   YouTubeImportResponse,
   YouTubeInspectResponse,
-} from "@shared/api";
+} from "@shared/schemas/contracts";
 import type {
   MapperConfigInfo,
   SessionSSEEvent,
   SpeechEngineStatus,
-} from "@shared/events";
-import type { IBISOpBatch } from "@shared/ibis";
+} from "@shared/schemas/events";
+import type { IBISOpBatch } from "@shared/schemas/models";
 
-export type { SessionSummary, YouTubeMetadata } from "@shared/api";
+export type { SessionSummary, YouTubeMetadata } from "@shared/schemas/contracts";
 
 export class ApiError extends Error {
   status: number;

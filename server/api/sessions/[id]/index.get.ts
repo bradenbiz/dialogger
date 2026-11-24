@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { SessionResponse } from "../../../../shared/api";
+import type { SessionResponse } from "../../../../shared/schemas/contracts";
 import { fail, getSessionParam } from "../../../http";
 
 defineRouteMeta({

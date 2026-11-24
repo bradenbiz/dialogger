@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { SpeechEngineStatus } from "../../../shared/events";
+import type { SpeechEngineStatus } from "../../../shared/schemas/events";
 import { fail } from "../../http";
 import { speechEngine } from "../../speech";
 

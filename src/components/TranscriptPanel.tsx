@@ -16,7 +16,7 @@ import {
   Users,
   Volume2,
 } from "lucide-react";
-import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/ibis";
+import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
 import { formatTime } from "@/lib/export";
 import { AudioScrubber } from "./AudioScrubber";
 

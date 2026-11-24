@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { DeletedResponse } from "../../../../shared/api";
+import type { DeletedResponse } from "../../../../shared/schemas/contracts";
 import { fail, param } from "../../../http";
 import { cancelActiveTranscribe } from "../../../jobs";
 import { sessionStore } from "../../../store";

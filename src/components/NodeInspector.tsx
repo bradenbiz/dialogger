@@ -9,14 +9,13 @@ import {
   X,
 } from "lucide-react";
 import {
-  IBIS_NODE_META,
-  LEGAL_IBIS_CHILDREN,
   type DialogueSession,
   type IBISNode,
   type IBISNodeType,
   type Speaker,
   type TranscriptTurn,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
+import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN } from "@shared/ibis";
 import { formatTime } from "@/lib/export";
 
 interface NodeInspectorProps {

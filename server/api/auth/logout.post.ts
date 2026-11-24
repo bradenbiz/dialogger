@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { OkResponse } from "../../../shared/api";
+import type { OkResponse } from "../../../shared/schemas/contracts";
 import { SESSION_COOKIE } from "../../auth";
 
 defineRouteMeta({

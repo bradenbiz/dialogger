@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { StoppedResponse } from "../../../../../shared/api";
+import type { StoppedResponse } from "../../../../../shared/schemas/contracts";
 import { param } from "../../../../http";
 import { cancelActiveTranscribe } from "../../../../jobs";
 

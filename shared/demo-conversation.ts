@@ -1,4 +1,4 @@
-import type { IBISMapOp } from "./ibis";
+import type { IBISMapOp } from "./schemas/models";
 
 export interface DemoBeat {
   speakerChannel: number;

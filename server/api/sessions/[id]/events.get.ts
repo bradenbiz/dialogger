@@ -1,6 +1,6 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { createEventStream } from "nitro/h3";
-import type { SessionSSEEvent } from "../../../../shared/events";
+import type { SessionSSEEvent } from "../../../../shared/schemas/events";
 import { fail, getSessionParam } from "../../../http";
 import { sessionStore } from "../../../store";
 

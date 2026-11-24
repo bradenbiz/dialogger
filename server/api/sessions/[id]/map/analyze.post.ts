@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { MapAnalyzeRequestSchema, type SessionResponse } from "../../../../../shared/api";
+import { MapAnalyzeRequestSchema, type SessionResponse } from "../../../../../shared/schemas/contracts";
 import { fail, getSessionParam, parseBody } from "../../../../http";
 import { enqueueMapRun } from "../../../../jobs";
 import { sessionStore } from "../../../../store";

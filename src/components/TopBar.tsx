@@ -14,7 +14,7 @@ import {
   Upload,
   Youtube,
 } from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
 import {
   exportMapAsMarkdown,

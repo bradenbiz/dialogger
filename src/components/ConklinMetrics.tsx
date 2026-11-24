@@ -1,9 +1,6 @@
 import { AlertCircle, CheckCircle2, HelpCircle, Scale, Sparkles } from "lucide-react";
-import {
-  IBIS_NODE_META,
-  type ConklinMapStats,
-  type IBISNodeType,
-} from "@shared/ibis";
+import { type IBISNodeType } from "@shared/schemas/models";
+import { IBIS_NODE_META, type ConklinMapStats } from "@shared/ibis";
 
 export type FacilitationLens = "all" | "open-questions" | "contested" | "decisions";
 

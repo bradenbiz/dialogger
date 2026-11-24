@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  computeConklinStats,
-  IBIS_NODE_META,
   type DialogueSession,
   type HostContextCategory,
   type IBISNodeType,
   type TranscriptTurn,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
+import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
 import { api, ApiError, type SessionSummary } from "@/lib/api";
 import {
   startLiveMicCapture,

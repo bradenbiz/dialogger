@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Bot, Check, Copy, Terminal, X } from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import type { DialogueSession } from "@shared/schemas/models";
 
 interface AgentModalProps {
   session: DialogueSession;

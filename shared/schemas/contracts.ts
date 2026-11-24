@@ -12,13 +12,13 @@ import {
   SpeakerSchema,
   TranscriptTurnSchema,
   TurnSourceSchema,
-} from "./ibis";
+} from "./models";
 import {
   EnrolledVoiceInfoSchema,
   MapperModeSchema,
   MapperProviderSchema,
 } from "./events";
-import { named } from "./schema-registry";
+import { named } from "./registry";
 
 // --- Shared building blocks ---
 

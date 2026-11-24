@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { VoiceListResponse } from "../../../shared/api";
+import type { VoiceListResponse } from "../../../shared/schemas/contracts";
 import { voiceBank } from "../../voicebank";
 
 defineRouteMeta({

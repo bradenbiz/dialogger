@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { MapperConfigInfo } from "../../../shared/events";
+import type { MapperConfigInfo } from "../../../shared/schemas/events";
 import { dialogueMapper } from "../../mapper";
 
 defineRouteMeta({

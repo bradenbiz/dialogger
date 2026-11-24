@@ -113,15 +113,16 @@ If you change `DIALOGGER_PORT` or `DIALOGGER_HOST`, the URLs change with it.
 Outside the browser, send `Authorization: Bearer <key>`.
 
 **Where the docs come from.** The request and response shapes are Zod schemas in `shared/`:
-- [`shared/api.ts`](shared/api.ts): request and response bodies
-- [`shared/ibis.ts`](shared/ibis.ts): sessions, turns, speakers, map nodes, and map operations
-- [`shared/events.ts`](shared/events.ts): live-stream events and status types
+- [`shared/schemas/contracts.ts`](shared/schemas/contracts.ts): request and response bodies for each endpoint
+- [`shared/schemas/models.ts`](shared/schemas/models.ts): sessions, turns, speakers, map nodes, and map operations
+- [`shared/schemas/events.ts`](shared/schemas/events.ts): live-stream events and status types
+- [`shared/schemas/registry.ts`](shared/schemas/registry.ts): names the schemas and turns them into OpenAPI definitions
 
 The server validates requests with these schemas, and the web client uses the same types. The Swagger definitions are generated from them when the spec is served, so the docs can't drift from what the server accepts.
 
 **Documenting a new endpoint:**
 1. Add the route file under `server/api/`.
-2. Define its body schemas in `shared/api.ts` and give each one a name with `named("MyThing", ...)`.
+2. Define its body schemas in `shared/schemas/contracts.ts` and give each one a name with `named("MyThing", ...)`.
 3. In the route's `defineRouteMeta`, reference them as `#/components/schemas/MyThing`.
 
 `pnpm test` fails if a route references a schema name that doesn't exist.

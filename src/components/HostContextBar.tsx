@@ -10,7 +10,7 @@ import type {
   HostContextCategory,
   HostContextItem,
   Speaker,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
 
 interface HostContextBarProps {
   items: HostContextItem[];

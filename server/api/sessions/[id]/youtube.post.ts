@@ -5,7 +5,7 @@ import {
   YouTubeImportRequestSchema,
   type CancelledResponse,
   type YouTubeImportResponse,
-} from "../../../../shared/api";
+} from "../../../../shared/schemas/contracts";
 import { fail, getSessionParam, parseBody } from "../../../http";
 import {
   broadcastJobIdle,

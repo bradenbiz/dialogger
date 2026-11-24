@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { YouTubeInspectRequestSchema, type YouTubeInspectResponse } from "../../../shared/api";
+import { YouTubeInspectRequestSchema, type YouTubeInspectResponse } from "../../../shared/schemas/contracts";
 import { fail, parseBody } from "../../http";
 import { fetchYouTubeMetadata, hasYtDlp } from "../../youtube";
 

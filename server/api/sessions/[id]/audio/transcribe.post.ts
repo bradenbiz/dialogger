@@ -8,7 +8,7 @@ import {
   TranscribeSavedAudioRequestSchema,
   type CancelledResponse,
   type TranscribeSavedAudioResponse,
-} from "../../../../../shared/api";
+} from "../../../../../shared/schemas/contracts";
 import { fail, getSessionParam, parseBody } from "../../../../http";
 import {
   broadcastJobIdle,

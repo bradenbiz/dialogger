@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 import type { WebSocketPeer as Peer } from "nitro/h3";
-import type { WordTiming } from "../shared/ibis";
+import type { WordTiming } from "../shared/schemas/models";
 import { createDiarizationWindowContext, sessionStore } from "./store";
 import {
   alignWordsToDiarization,

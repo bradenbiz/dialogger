@@ -2,7 +2,7 @@ import { defineHandler, defineRouteMeta } from "nitro";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { TrimAudioRequestSchema, type SessionResponse } from "../../../../../shared/api";
+import { TrimAudioRequestSchema, type SessionResponse } from "../../../../../shared/schemas/contracts";
 import { fail, getSessionParam, parseBody } from "../../../../http";
 import { cancelActiveTranscribe } from "../../../../jobs";
 import { sessionStore } from "../../../../store";

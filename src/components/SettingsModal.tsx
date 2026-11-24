@@ -10,12 +10,12 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import type { DialogueSession } from "@shared/schemas/models";
 import type {
   EnrolledVoiceInfo,
   MapperConfigInfo,
   SpeechEngineStatus,
-} from "@shared/events";
+} from "@shared/schemas/events";
 import { api } from "@/lib/api";
 
 interface SettingsModalProps {

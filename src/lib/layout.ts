@@ -1,5 +1,5 @@
 import { hierarchy, tree } from "d3-hierarchy";
-import type { IBISCrossLink, IBISNode } from "@shared/ibis";
+import type { IBISCrossLink, IBISNode } from "@shared/schemas/models";
 
 export const NODE_WIDTH = 286;
 export const NODE_BASE_HEIGHT = 84;

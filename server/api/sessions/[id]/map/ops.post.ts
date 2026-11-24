@@ -1,5 +1,5 @@
 import { defineHandler, defineRouteMeta } from "nitro";
-import { IBISOpBatchSchema, type ApplyMapOpsResponse } from "../../../../../shared/api";
+import { IBISOpBatchSchema, type ApplyMapOpsResponse } from "../../../../../shared/schemas/contracts";
 import { fail, getSessionParam, parseBody } from "../../../../http";
 import { sessionStore } from "../../../../store";
 

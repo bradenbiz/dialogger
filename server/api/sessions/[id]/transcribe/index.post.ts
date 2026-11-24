@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { defineHandler, defineRouteMeta } from "nitro";
-import type { CancelledResponse, TranscribeFileResponse } from "../../../../../shared/api";
+import type { CancelledResponse, TranscribeFileResponse } from "../../../../../shared/schemas/contracts";
 import { encodePlayableMp3 } from "../../../../youtube";
 import { fail, getSessionParam } from "../../../../http";
 import {

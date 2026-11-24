@@ -10,13 +10,11 @@ import {
   Youtube,
 } from "lucide-react";
 import {
-  IBIS_NODE_META,
-  LEGAL_IBIS_CHILDREN,
-  type ConklinMapStats,
   type DialogueSession,
   type IBISNodeType,
   type Speaker,
-} from "@shared/ibis";
+} from "@shared/schemas/models";
+import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN, type ConklinMapStats } from "@shared/ibis";
 import { computeDialogueMapLayout, type PositionedNode } from "@/lib/layout";
 import type { FacilitationLens } from "./ConklinMetrics";
 

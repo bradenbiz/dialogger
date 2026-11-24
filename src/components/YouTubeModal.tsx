@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, Loader2, Sparkles, X, Youtube } from "lucide-react";
-import type { DialogueSession } from "@shared/ibis";
+import type { DialogueSession } from "@shared/schemas/models";
 import { api, type YouTubeMetadata } from "@/lib/api";
 import { formatTime } from "@/lib/export";
 

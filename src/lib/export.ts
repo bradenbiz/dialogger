@@ -1,8 +1,5 @@
-import {
-  IBIS_NODE_META,
-  type DialogueSession,
-  type IBISNode,
-} from "@shared/ibis";
+import { type DialogueSession, type IBISNode } from "@shared/schemas/models";
+import { IBIS_NODE_META } from "@shared/ibis";
 import { computeDialogueMapLayout } from "./layout";
 
 function escapeXml(str: string): string {

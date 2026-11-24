@@ -1,6 +1,6 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { getRequestProtocol } from "nitro/h3";
-import { LoginRequestSchema, type LoginResponse } from "../../../shared/api";
+import { LoginRequestSchema, type LoginResponse } from "../../../shared/schemas/contracts";
 import { API_KEY, OWNER_KEY, SESSION_COOKIE, computeSessionCookieToken, timingSafeEqualStr } from "../../auth";
 import { fail, parseBody } from "../../http";
 
