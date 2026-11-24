@@ -104,12 +104,16 @@ export function enqueueMapRun(
           });
           return;
         }
-        if (batch.ops.length > 0 || (batch.markTurnIdsMapped?.length ?? 0) > 0) {
-          sessionStore.applyMapOps(sessionId, batch);
+        const { fallbackReason, ...ops } = batch;
+        if (ops.ops.length > 0 || (ops.markTurnIdsMapped?.length ?? 0) > 0) {
+          sessionStore.applyMapOps(sessionId, ops);
         }
+        // The LLM failed and the heuristic mapped instead: say so, or it looks like it worked
         sessionStore.broadcast(sessionId, {
           type: "mapper.status",
-          status: "idle",
+          ...(fallbackReason
+            ? { status: "error", message: fallbackReason }
+            : { status: "idle" }),
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
