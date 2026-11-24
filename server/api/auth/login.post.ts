@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { getRequestProtocol } from "nitro/h3";
 import { LoginRequestSchema, type LoginResponse } from "../../../shared/schemas/contracts";
-import { API_KEY, OWNER_KEY, SESSION_COOKIE, computeSessionCookieToken, timingSafeEqualStr } from "../../auth";
-import { fail, parseBody } from "../../http";
+import { API_KEY, OWNER_KEY, SESSION_COOKIE, computeSessionCookieToken, timingSafeEqualStr } from "../../lib/auth";
+import { fail, parseBody } from "../../lib/http";
 
 defineRouteMeta({
   openAPI: {

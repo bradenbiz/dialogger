@@ -8,8 +8,8 @@ import {
   type IBISNode,
   type IBISOpBatch,
   type TranscriptTurn,
-} from "../shared/schemas/models";
-import type { MapperConfigInfo } from "../shared/schemas/events";
+} from "../../shared/schemas/models";
+import type { MapperConfigInfo } from "../../shared/schemas/events";
 import {
   CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT,
   buildMappingUserPrompt,

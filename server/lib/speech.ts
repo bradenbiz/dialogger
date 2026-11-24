@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import type { WordTiming } from "../shared/schemas/models";
-import type { SpeechEngineStatus } from "../shared/schemas/events";
+import type { WordTiming } from "../../shared/schemas/models";
+import type { SpeechEngineStatus } from "../../shared/schemas/events";
 import {
   readPcm16FromWav,
   voiceBank,

@@ -9,7 +9,7 @@ import {
   type CancelledResponse,
   type TranscribeSavedAudioResponse,
 } from "../../../../../shared/schemas/contracts";
-import { fail, getSessionParam, parseBody } from "../../../../http";
+import { fail, getSessionParam, parseBody } from "../../../../lib/http";
 import {
   broadcastJobIdle,
   finishTranscribeJob,
@@ -17,14 +17,14 @@ import {
   reportJobError,
   runAutoMap,
   startTranscribeJob,
-} from "../../../../jobs";
-import { speechEngine } from "../../../../speech";
+} from "../../../../lib/jobs";
+import { speechEngine } from "../../../../lib/speech";
 import {
   createDiarizationWindowContext,
   sessionStore,
   type DiarizationWindowContext,
-} from "../../../../store";
-import { voiceBank } from "../../../../voicebank";
+} from "../../../../lib/store";
+import { voiceBank } from "../../../../lib/voicebank";
 
 defineRouteMeta({
   openAPI: {

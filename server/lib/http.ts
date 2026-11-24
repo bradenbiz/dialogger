@@ -1,6 +1,6 @@
 import { getRouterParam, readBody, type H3Event } from "nitro/h3";
 import { z } from "zod";
-import type { ErrorResponse } from "../shared/schemas/contracts";
+import type { ErrorResponse } from "../../shared/schemas/contracts";
 import { sessionStore } from "./store";
 
 /** JSON error response in the shared `ErrorResponse` shape. */

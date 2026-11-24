@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import fs from "node:fs";
 import { Readable } from "node:stream";
-import { fail, param } from "../../../../http";
-import { sessionStore } from "../../../../store";
+import { fail, param } from "../../../../lib/http";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

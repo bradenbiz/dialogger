@@ -1,7 +1,7 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { SessionResponse } from "../../../../../shared/schemas/contracts";
-import { fail, param } from "../../../../http";
-import { sessionStore } from "../../../../store";
+import { fail, param } from "../../../../lib/http";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

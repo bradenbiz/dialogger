@@ -6,7 +6,7 @@ import {
   type CancelledResponse,
   type YouTubeImportResponse,
 } from "../../../../shared/schemas/contracts";
-import { fail, getSessionParam, parseBody } from "../../../http";
+import { fail, getSessionParam, parseBody } from "../../../lib/http";
 import {
   broadcastJobIdle,
   finishTranscribeJob,
@@ -15,15 +15,15 @@ import {
   reportJobError,
   runAutoMap,
   startTranscribeJob,
-} from "../../../jobs";
-import { speechEngine } from "../../../speech";
+} from "../../../lib/jobs";
+import { speechEngine } from "../../../lib/speech";
 import {
   createDiarizationWindowContext,
   sessionStore,
   type DiarizationWindowContext,
-} from "../../../store";
-import { voiceBank } from "../../../voicebank";
-import { downloadYouTubeAudio, encodePlayableMp3, hasYtDlp } from "../../../youtube";
+} from "../../../lib/store";
+import { voiceBank } from "../../../lib/voicebank";
+import { downloadYouTubeAudio, encodePlayableMp3, hasYtDlp } from "../../../lib/youtube";
 
 defineRouteMeta({
   openAPI: {

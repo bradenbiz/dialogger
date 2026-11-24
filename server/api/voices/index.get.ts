@@ -1,6 +1,6 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { VoiceListResponse } from "../../../shared/schemas/contracts";
-import { voiceBank } from "../../voicebank";
+import { voiceBank } from "../../lib/voicebank";
 
 defineRouteMeta({
   openAPI: {

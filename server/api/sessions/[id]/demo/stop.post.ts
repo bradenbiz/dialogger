@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { StoppedResponse } from "../../../../../shared/schemas/contracts";
-import { param } from "../../../../http";
-import { stopDemo } from "../../../../jobs";
-import { sessionStore } from "../../../../store";
+import { param } from "../../../../lib/http";
+import { stopDemo } from "../../../../lib/jobs";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

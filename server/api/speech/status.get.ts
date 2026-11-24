@@ -1,7 +1,7 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { SpeechEngineStatus } from "../../../shared/schemas/events";
-import { fail } from "../../http";
-import { speechEngine } from "../../speech";
+import { fail } from "../../lib/http";
+import { speechEngine } from "../../lib/speech";
 
 defineRouteMeta({
   openAPI: {

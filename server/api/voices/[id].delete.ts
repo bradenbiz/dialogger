@@ -1,7 +1,7 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { VoiceDeletedResponse } from "../../../shared/schemas/contracts";
-import { fail, param } from "../../http";
-import { voiceBank } from "../../voicebank";
+import { fail, param } from "../../lib/http";
+import { voiceBank } from "../../lib/voicebank";
 
 defineRouteMeta({
   openAPI: {

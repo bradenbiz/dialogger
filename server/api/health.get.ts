@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { getQuery } from "nitro/h3";
 import type { HealthResponse } from "../../shared/schemas/contracts";
-import { API_KEY, OWNER_KEY, isAuthorizedRequest } from "../auth";
-import { sessionStore } from "../store";
+import { API_KEY, OWNER_KEY, isAuthorizedRequest } from "../lib/auth";
+import { sessionStore } from "../lib/store";
 
 defineRouteMeta({
   openAPI: {

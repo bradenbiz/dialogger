@@ -22,7 +22,7 @@ Before committing, run `pnpm typecheck` and `pnpm test`. For changes to what the
 | `server/routes/ws/**` | Live-mic WebSocket (crossws) |
 | `server/middleware/` | `auth.ts` (API key / session cookie for `/api/*`), `openapi.ts` (fills in schema definitions) |
 | `server/plugins/startup.ts` | Startup guard and seed data |
-| `server/*.ts` | Domain modules: `store.ts` (sessions, persistence, SSE broadcast), `jobs.ts` (transcription/map job tracking), `speech.ts`, `mapper.ts`, `youtube.ts`, `http.ts` (route helpers) |
+| `server/lib/` | Plain modules Nitro doesn't scan: `store.ts` (sessions, persistence, SSE broadcast), `jobs.ts` (transcription/map job tracking), `speech.ts`, `live.ts`, `mapper.ts`, `youtube.ts`, `voicebank.ts`, `prompt.ts`, `auth.ts`, `http.ts` (route helpers) |
 | `shared/schemas/` | Zod schemas shared by server, UI types, and OpenAPI: `models.ts`, `contracts.ts`, `events.ts`, `registry.ts` |
 | `shared/ibis.ts` | IBIS helpers (node meta, speaker palette, legal children, Conklin stats); no Zod |
 | `src/App.tsx` | The single screen: owns app state, the SSE subscription, and handlers passed down as props |
@@ -30,18 +30,20 @@ Before committing, run `pnpm typecheck` and `pnpm test`. For changes to what the
 | `src/lib/` | `api.ts` (typed fetch/SSE client), `url-state.ts`, `export.ts`, `format.ts`, `layout.ts` (d3-hierarchy), `audio-capture.ts` |
 | `tests/` | Vitest; `vitest.config.ts` is separate so tests don't boot the Nitro plugin |
 
-Path aliases: `@/` is `src/`, `@shared/` is `shared/`. Server code imports `shared/` by relative path (`../shared/...`).
+Path aliases: `@/` is `src/`, `@shared/` is `shared/`. Server code imports `shared/` by relative path (`../../shared/...` from `server/lib/`).
+
+`server/` holds only Nitro's scanned folders (`api/`, `routes/`, `middleware/`, `plugins/`), where a file's location decides what it becomes, plus `lib/` for everything else. Put new server modules in `server/lib/`, not at the top level, and don't name a folder `utils/`, which Nitro can treat specially.
 
 ## Design patterns
 
 ### Server
 
-- **Thin route handlers.** Each route file is `defineRouteMeta({ openAPI })` + `defineHandler`. Validate with `parseBody(event, Schema)` from `server/http.ts`; if it returns a `Response`, return it. Business logic lives in `server/*.ts`, mostly `sessionStore`.
+- **Thin route handlers.** Each route file is `defineRouteMeta({ openAPI })` + `defineHandler`. Validate with `parseBody(event, Schema)` from `server/lib/http.ts`; if it returns a `Response`, return it. Business logic lives in `server/lib/`, mostly `sessionStore`.
 - **One error shape.** Non-2xx responses are `{ error }` via `fail(status, error)`. Validation errors are `{ formErrors, fieldErrors }` from `z.flattenError`.
 - **Responses are checked against contracts** with `satisfies SomeResponse`, not cast.
 - **OpenAPI from Zod.** `defineRouteMeta` only allows static literals, so routes reference `#/components/schemas/<Name>`. Name a schema with `named("Name", schema)` in `shared/schemas/*`; `server/middleware/openapi.ts` fills in the definitions at request time. `pnpm test` fails if a `$ref` points at a name that doesn't exist. Document 400/401/404 responses like the existing routes do.
 - **Live updates go through the store.** Mutations call `sessionStore.broadcast(id, event)`; `GET /api/sessions/[id]/events` streams those as SSE. Event shapes are the `SessionSSEEvent` union in `shared/schemas/events.ts`.
-- **Long jobs are cancellable.** Transcription registers an `AbortController` in `server/jobs.ts`; a newer job or `/transcribe/stop` cancels the old one, which then returns `{ cancelled: true }`.
+- **Long jobs are cancellable.** Transcription registers an `AbortController` in `server/lib/jobs.ts`; a newer job or `/transcribe/stop` cancels the old one, which then returns `{ cancelled: true }`.
 
 ### Web UI
 

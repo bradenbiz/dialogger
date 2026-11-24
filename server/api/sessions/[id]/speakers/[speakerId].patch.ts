@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { RenameSpeakerRequestSchema, type SpeakerResponse } from "../../../../../shared/schemas/contracts";
-import { fail, param, parseBody } from "../../../../http";
-import { sessionStore } from "../../../../store";
-import { voiceBank } from "../../../../voicebank";
+import { fail, param, parseBody } from "../../../../lib/http";
+import { sessionStore } from "../../../../lib/store";
+import { voiceBank } from "../../../../lib/voicebank";
 
 defineRouteMeta({
   openAPI: {

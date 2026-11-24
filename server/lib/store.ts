@@ -10,9 +10,9 @@ import {
   type SessionAudioMeta,
   type Speaker,
   type TranscriptTurn,
-} from "../shared/schemas/models";
-import { defaultRelationLabel, SPEAKER_PALETTE } from "../shared/ibis";
-import type { SessionSSEEvent } from "../shared/schemas/events";
+} from "../../shared/schemas/models";
+import { defaultRelationLabel, SPEAKER_PALETTE } from "../../shared/ibis";
+import type { SessionSSEEvent } from "../../shared/schemas/events";
 
 type Listener = (event: SessionSSEEvent) => void;
 

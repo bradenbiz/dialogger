@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { WebSocketPeer as Peer } from "nitro/h3";
-import type { WordTiming } from "../shared/schemas/models";
+import type { WordTiming } from "../../shared/schemas/models";
 import { createDiarizationWindowContext, sessionStore } from "./store";
 import {
   alignWordsToDiarization,

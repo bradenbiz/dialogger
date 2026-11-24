@@ -3,10 +3,10 @@ import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { TrimAudioRequestSchema, type SessionResponse } from "../../../../../shared/schemas/contracts";
-import { fail, getSessionParam, parseBody } from "../../../../http";
-import { cancelActiveTranscribe } from "../../../../jobs";
-import { sessionStore } from "../../../../store";
-import { probeDurationSec } from "../../../../youtube";
+import { fail, getSessionParam, parseBody } from "../../../../lib/http";
+import { cancelActiveTranscribe } from "../../../../lib/jobs";
+import { sessionStore } from "../../../../lib/store";
+import { probeDurationSec } from "../../../../lib/youtube";
 
 defineRouteMeta({
   openAPI: {

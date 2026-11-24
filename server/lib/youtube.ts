@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import type { YouTubeMetadata } from "../shared/schemas/contracts";
+import type { YouTubeMetadata } from "../../shared/schemas/contracts";
 
 const execFileAsync = promisify(execFile);
 

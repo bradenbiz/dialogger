@@ -5,8 +5,8 @@ import {
   HOST,
   OWNER_KEY,
   isLoopbackHost,
-} from "../auth";
-import { sessionStore } from "../store";
+} from "../lib/auth";
+import { sessionStore } from "../lib/store";
 
 export default definePlugin(() => {
   // Refuse to expose an unauthenticated server on non-loopback interfaces unless explicitly opted in (S1)

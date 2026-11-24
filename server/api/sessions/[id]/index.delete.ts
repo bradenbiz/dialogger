@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { DeletedResponse } from "../../../../shared/schemas/contracts";
-import { fail, param } from "../../../http";
-import { cancelActiveTranscribe } from "../../../jobs";
-import { sessionStore } from "../../../store";
+import { fail, param } from "../../../lib/http";
+import { cancelActiveTranscribe } from "../../../lib/jobs";
+import { sessionStore } from "../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

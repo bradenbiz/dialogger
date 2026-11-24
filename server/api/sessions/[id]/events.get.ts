@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { createEventStream } from "nitro/h3";
 import type { SessionSSEEvent } from "../../../../shared/schemas/events";
-import { fail, getSessionParam } from "../../../http";
-import { sessionStore } from "../../../store";
+import { fail, getSessionParam } from "../../../lib/http";
+import { sessionStore } from "../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

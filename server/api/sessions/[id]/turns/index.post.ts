@@ -1,8 +1,8 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { AppendTurnsRequestSchema, type AppendTurnsResponse } from "../../../../../shared/schemas/contracts";
-import { fail, getSessionParam, json, parseBody } from "../../../../http";
-import { runAutoMap } from "../../../../jobs";
-import { sessionStore } from "../../../../store";
+import { fail, getSessionParam, json, parseBody } from "../../../../lib/http";
+import { runAutoMap } from "../../../../lib/jobs";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

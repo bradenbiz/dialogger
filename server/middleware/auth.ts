@@ -1,6 +1,6 @@
 import { defineMiddleware, getQuery } from "nitro/h3";
-import { isAuthorizedRequest } from "../auth";
-import { fail } from "../http";
+import { isAuthorizedRequest } from "../lib/auth";
+import { fail } from "../lib/http";
 
 const PUBLIC_API_PATHS = new Set(["/api/health", "/api/auth/login", "/api/auth/logout"]);
 

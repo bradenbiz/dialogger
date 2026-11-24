@@ -1,6 +1,6 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { ConklinPromptResponse } from "../../../shared/schemas/contracts";
-import { CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT } from "../../prompt";
+import { CONKLIN_DIALOGUE_MAPPING_SYSTEM_PROMPT } from "../../lib/prompt";
 
 defineRouteMeta({
   openAPI: {

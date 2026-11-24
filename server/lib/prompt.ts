@@ -1,4 +1,4 @@
-import type { DialogueSession, TranscriptTurn } from "../shared/schemas/models";
+import type { DialogueSession, TranscriptTurn } from "../../shared/schemas/models";
 
 /**
  * Authoritative Jeffrey Conklin Dialogue Mapping (IBIS) System Prompt.

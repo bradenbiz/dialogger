@@ -1,9 +1,9 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { DemoStartRequestSchema, type DemoStartResponse } from "../../../../../shared/schemas/contracts";
 import { WICKED_PROBLEM_DEMO_BEATS, WICKED_PROBLEM_DEMO_TITLE } from "../../../../../shared/demo-conversation";
-import { fail, getSessionParam, parseBody } from "../../../../http";
-import { clearDemoTimers, setDemoTimers, stopDemo } from "../../../../jobs";
-import { sessionStore } from "../../../../store";
+import { fail, getSessionParam, parseBody } from "../../../../lib/http";
+import { clearDemoTimers, setDemoTimers, stopDemo } from "../../../../lib/jobs";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

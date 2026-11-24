@@ -1,8 +1,8 @@
 import { defineRouteMeta } from "nitro";
 import { defineWebSocketHandler } from "nitro/h3";
-import { isAuthorizedRequest } from "../../../../auth";
-import { startLiveAudioSession, type LiveSessionHandlers } from "../../../../live";
-import { sessionStore } from "../../../../store";
+import { isAuthorizedRequest } from "../../../../lib/auth";
+import { startLiveAudioSession, type LiveSessionHandlers } from "../../../../lib/live";
+import { sessionStore } from "../../../../lib/store";
 
 defineRouteMeta({
   openAPI: {

@@ -1,6 +1,6 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { OkResponse } from "../../../shared/schemas/contracts";
-import { SESSION_COOKIE } from "../../auth";
+import { SESSION_COOKIE } from "../../lib/auth";
 
 defineRouteMeta({
   openAPI: {

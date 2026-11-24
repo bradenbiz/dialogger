@@ -7,18 +7,18 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { defineHandler, defineRouteMeta } from "nitro";
 import type { CancelledResponse, TranscribeFileResponse } from "../../../../../shared/schemas/contracts";
-import { encodePlayableMp3 } from "../../../../youtube";
-import { fail, getSessionParam } from "../../../../http";
+import { encodePlayableMp3 } from "../../../../lib/youtube";
+import { fail, getSessionParam } from "../../../../lib/http";
 import {
   finishTranscribeJob,
   isCurrentJob,
   mapAddedTurnsInChunks,
   reportJobError,
   startTranscribeJob,
-} from "../../../../jobs";
-import { speechEngine } from "../../../../speech";
-import { createDiarizationWindowContext, sessionStore } from "../../../../store";
-import { voiceBank } from "../../../../voicebank";
+} from "../../../../lib/jobs";
+import { speechEngine } from "../../../../lib/speech";
+import { createDiarizationWindowContext, sessionStore } from "../../../../lib/store";
+import { voiceBank } from "../../../../lib/voicebank";
 
 const UPLOAD_DIR = path.join(os.tmpdir(), "dialogger-uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });

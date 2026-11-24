@@ -1,9 +1,9 @@
 import { defineHandler, defineRouteMeta } from "nitro";
 import { MapperConfigUpdateSchema } from "../../../shared/schemas/contracts";
 import type { MapperConfigInfo } from "../../../shared/schemas/events";
-import { isOwnerRequest } from "../../auth";
-import { fail, parseBody } from "../../http";
-import { dialogueMapper } from "../../mapper";
+import { isOwnerRequest } from "../../lib/auth";
+import { fail, parseBody } from "../../lib/http";
+import { dialogueMapper } from "../../lib/mapper";
 
 defineRouteMeta({
   openAPI: {
