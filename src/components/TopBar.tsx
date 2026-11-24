@@ -14,6 +14,7 @@ import Upload from "lucide-react/icons/upload";
 import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
+import { preloadOnIntent } from "@/components/panels";
 
 /** The exporters only load when the user picks one from the Export menu. */
 const loadExport = () => import("@/lib/export");
@@ -292,6 +293,7 @@ export function TopBar({
           type="button"
           disabled={isTranscribing}
           onClick={onOpenYouTubeModal}
+          {...preloadOnIntent("youtube")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-stone-200 text-stone-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-800 transition disabled:opacity-50"
           title="Paste a YouTube link to download audio, diarize locally, and map live"
         >
@@ -327,6 +329,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenAgentModal}
+          {...preloadOnIntent("agent")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 transition"
           title="Connect an AI agent or model to drive this live Dialogue Map"
         >
@@ -391,6 +394,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenSettings}
+          {...preloadOnIntent("settings")}
           className="p-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition"
           title="Speech models (Nemotron 3 / Parakeet) & Dialogue Mapper settings"
         >

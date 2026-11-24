@@ -14,6 +14,7 @@ import {
 } from "@shared/schemas/models";
 import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN, type ConklinMapStats } from "@shared/ibis";
 import { computeDialogueMapLayout, type PositionedNode } from "@/lib/layout";
+import { preloadOnIntent } from "@/components/panels";
 import type { FacilitationLens } from "./ConklinMetrics";
 
 interface DialogueMapCanvasProps {
@@ -245,6 +246,7 @@ export function DialogueMapCanvas({
               <button
                 type="button"
                 onClick={onOpenYouTube}
+                {...preloadOnIntent("youtube")}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-stone-900 text-white hover:bg-stone-800 transition shadow-xs"
               >
                 <Youtube className="w-4 h-4 text-rose-400" />
