@@ -27,7 +27,7 @@ Before committing, run `pnpm typecheck` and `pnpm test`. For changes to what the
 | `shared/ibis.ts` | IBIS helpers (node meta, speaker palette, legal children, Conklin stats); no Zod |
 | `src/App.tsx` | The single screen: owns app state, the SSE subscription, and handlers passed down as props |
 | `src/components/` | Feature components; `panels.tsx` holds the lazy-loaded modals |
-| `src/lib/` | `api.ts` (typed fetch/SSE client), `url-state.ts`, `export.ts`, `format.ts`, `layout.ts` (d3-hierarchy), `audio-capture.ts` |
+| `src/lib/` | `api.ts` (typed fetch/SSE client), `queries.ts` (SWR hooks and cache helpers), `url-state.ts`, `export.ts`, `format.ts`, `layout.ts` (d3-hierarchy), `audio-capture.ts` |
 | `tests/` | Vitest; `vitest.config.ts` is separate so tests don't boot the Nitro plugin |
 
 Path aliases: `@/` is `src/`, `@shared/` is `shared/`. Server code imports `shared/` by relative path (`../../shared/...` from `server/lib/`).
@@ -48,7 +48,8 @@ Path aliases: `@/` is `src/`, `@shared/` is `shared/`. Server code imports `shar
 ### Web UI
 
 - **One page, no router.** `?session=<id>&panel=settings|youtube|agent` is the URL state, read and written by `src/lib/url-state.ts` (`useUrlState`, `openPanel`, `closePanel`). Switching sessions pushes a history entry; closing a panel the app opened steps back, so Back never reopens it. We tried TanStack Router and dropped it: about 30 KB gzip for one screen. Revisit only if real pages appear.
-- **State lives in `App.tsx`** and flows down as props and callbacks. Components don't fetch on their own, except modals loading their own settings data.
+- **Server state lives in the SWR cache** (`src/lib/queries.ts`): the session list, the open session, speech status, mapper config, and voices. The open session's SSE stream writes into its cache entry (`applySessionEvent`), so it never revalidates on its own; after a change, refresh with `invalidateSessions()` rather than refetching by hand. UI state lives in `App.tsx` and flows down as props and callbacks. Components don't fetch on their own, except modals loading their own settings data.
+- **Loading states.** Data that hasn't loaded is `undefined`, not a default like `?? []`. Render `data ? value : <Skeleton />` in the spot that shows it, and keep the static UI around it rendering normally.
 - **Typed API client.** `src/lib/api.ts` uses the request/response types from `shared/schemas/contracts.ts`. A 401 (`ApiError.status`) shows the sign-in screen. `api.subscribeToSession` wraps `EventSource`; `App.tsx` applies each event to `session` in one `switch`.
 - **Load code when it's needed.** Modals are `React.lazy` in `src/components/panels.tsx`, and buttons that open them spread `preloadOnIntent(panel)` to start the download on hover or focus. Exporters (`lib/export.ts`) and mic capture (`lib/audio-capture.ts`) are dynamic `import()`s at the point of use.
 - **Styling** is Tailwind v4 utilities inline (stone palette, `text-xs`, `rounded-lg`/`rounded-xl`, `transition`). No CSS modules; shared tokens are in `src/index.css`.
@@ -64,6 +65,7 @@ Path aliases: `@/` is `src/`, `@shared/` is `shared/`. Server code imports `shar
   The barrel re-exports ~1,900 icons, so the dev server loads all of them, and production relies on tree-shaking to remove them. Some old names are aliases (`Loader2` → `loader-circle`, `AlertCircle` → `circle-alert`, `CheckCircle2` → `circle-check`); the file name is the canonical kebab-case name. lucide v1 removed brand icons, so YouTube uses the local `src/components/YoutubeIcon.tsx`.
 - **No barrel files of our own.** Import from the module that defines the thing (e.g. `@/lib/format`), not an `index.ts` that re-exports a folder.
 - **A lazy chunk is only lazy if nothing imports it statically.** One stray static import (e.g. `formatTime` from `lib/export`) pulls the module back into the main bundle. That's why `formatTime` lives in `lib/format.ts`. Import modals only through `components/panels.tsx`.
+- **`lazy()` suspends on first render even when its chunk is already loaded,** and React 19 keeps a shown Suspense fallback up for ~300 ms. For a prefetched component, keep a reference to the loaded module and render it directly, using the lazy version only before the prefetch finishes (see `NodeInspector.tsx`).
 - **Keep runtime Zod out of the browser.** `src/` may `import type` from `shared/schemas/*`, but a value import pulls in Zod and every registered schema (~20+ KB gzip). For client-side form validation use `zod/mini`; keep enums the UI needs as plain arrays in a Zod-free shared module, and build the Zod enums from those arrays.
 - **pnpm's release-age policy can be bypassed silently.** `pnpm add` of a package published in the last day can append a `minimumReleaseAgeExclude` entry to `pnpm-workspace.yaml`. Never commit that; pin an older version that passes the policy instead (`npm view <pkg> time`). Verify with `pnpm install --frozen-lockfile`.
 - **Check for stray generated or local files before committing:** `.output/`, `.nitro/`, `.dialogger-data/`, `.claude/launch.json`, and generated files from other branches. Run `git status` first.
