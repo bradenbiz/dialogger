@@ -1,39 +1,47 @@
 {
   "name": "dialogger",
   "repository": "https://github.com/bradenbiz/dialogger",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "bin": {
+    "dialogger": "./bin/dialogger-cli.ts"
+  },
   "scripts": {
-    "dev": "next dev --turbo",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "cli": "tsx bin/dialogger-cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@types/d3-hierarchy": "^2.0.0",
-    "@types/d3-selection": "^2.0.0",
-    "@types/d3-zoom": "^2.0.0",
-    "@types/node": "18.15.11",
-    "@types/react": "18.0.37",
-    "@types/react-dom": "18.0.11",
-    "@vercel/kv": "0.2.1",
-    "autoprefixer": "10.4.14",
-    "d3-hierarchy": "^2.0.0",
-    "d3-save-svg": "^0.0.2",
-    "d3-selection": "^2.0.0",
-    "d3-zoom": "^2.0.0",
-    "eslint": "8.38.0",
-    "eslint-config-next": "13.3.0",
-    "next": "13.4.0",
-    "postcss": "8.4.22",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "tailwindcss": "3.3.1",
-    "typescript": "5.0.4"
+    "d3-hierarchy": "^3.1.2",
+    "express": "^5.1.0",
+    "lucide-react": "^0.511.0",
+    "multer": "^2.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "ws": "^8.18.2",
+    "zod": "^3.25.32"
   },
   "devDependencies": {
-    "@types/ms": "^0.7.31",
-    "autoprefixer": "^10.4.14",
-    "turbo": "^1.9.3"
+    "@tailwindcss/vite": "^4.1.7",
+    "@types/d3-hierarchy": "^3.1.7",
+    "@types/express": "^5.0.2",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.1.5",
+    "@types/react-dom": "^19.1.5",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.1.7",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
   }
 }

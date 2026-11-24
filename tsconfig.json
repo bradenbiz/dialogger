@@ -1,43 +1,25 @@
 {
   "compilerOptions": {
-    // "target": "es5",
-    // "lib": ["dom", "dom.iterable", "esnext"],
-
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "allowJs": true,
-    "skipLibCheck": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "noEmit": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "treeviz": ["./src/libs/treeviz"]
-    },
-    "noFallthroughCasesInSwitch": true,
-    "noUnusedParameters": true,
-    "noUnusedLocals": true,
-    "useDefineForClassFields": true
+      "@shared/*": ["shared/*"],
+      "@/*": ["src/*"]
+    }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "lib/seed.ts",
-    "src"
-  ],
-  "exclude": ["node_modules"]
+  "include": ["src", "server", "shared", "bin", "tests", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", ".dialogger-data"]
 }
