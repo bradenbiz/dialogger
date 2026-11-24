@@ -6,7 +6,17 @@ import {
   type TranscriptTurn,
 } from "@shared/schemas/models";
 import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
-import { api, ApiError, type SessionSummary } from "@/lib/api";
+import { api, type SessionSummary } from "@/lib/api";
+import {
+  applySessionEvent,
+  cacheSession,
+  invalidateSessions,
+  isUnauthorized,
+  queryClient,
+  queryKeys,
+  useSessionQuery,
+  useSessionsQuery,
+} from "@/lib/queries";
 import type { LiveMicController } from "@/lib/audio-capture";
 import { TopBar } from "@/components/TopBar";
 import {
@@ -23,8 +33,13 @@ import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
 export function App() {
   const [url, setUrl] = useUrlState();
 
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [session, setSession] = useState<DialogueSession | null>(null);
+  // Server state lives in the TanStack Query cache; the open session's live SSE stream
+  // writes into it (applySessionEvent), so `session` is always the cached copy.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const sessionsQuery = useSessionsQuery();
+  const sessions = sessionsQuery.data ?? [];
+  const sessionQuery = useSessionQuery(activeSessionId);
+  const session = sessionQuery.data ?? null;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(
     new Set()
@@ -47,10 +62,10 @@ export function App() {
 
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{ sec: number; nonce: number } | null>(null);
-  const [authRequired, setAuthRequired] = useState(false);
   const [authTokenInput, setAuthTokenInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authNonce, setAuthNonce] = useState(0);
+  const authRequired =
+    isUnauthorized(sessionsQuery.error) || isUnauthorized(sessionQuery.error);
 
   const micRef = useRef<LiveMicController | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -62,205 +77,82 @@ export function App() {
     }, 6500);
   }, []);
 
-  const refreshSessionsList = useCallback(async () => {
-    try {
-      const { sessions: list } = await api.listSessions();
-      setSessions(list);
-      return list;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setAuthRequired(true);
-        throw err;
-      }
-      return [];
-    }
+  /** Shows a session the server just returned (cache it, then make it the open one). */
+  const showSession = useCallback((next: DialogueSession) => {
+    cacheSession(next);
+    setActiveSessionId(next.id);
   }, []);
 
-  // Bootstrap: honor ?session=<id> URL param or load latest session
+  // Bootstrap once the session list loads: honor ?session=<id>, else open the latest,
+  // else create a first session.
   useEffect(() => {
+    if (activeSessionId || !sessionsQuery.data) return;
+    const list = sessionsQuery.data;
+    const urlId = new URLSearchParams(window.location.search).get("session");
+    const targetId =
+      (urlId && list.find((s) => s.id === urlId)?.id) || list[0]?.id;
+    if (targetId) {
+      setActiveSessionId(targetId);
+      return;
+    }
     let active = true;
-    void (async () => {
-      try {
-        const list = await refreshSessionsList();
-        const urlId = new URLSearchParams(window.location.search).get("session");
-        const targetId =
-          (urlId && list.find((s) => s.id === urlId)?.id) || list[0]?.id;
-
-        if (targetId) {
-          const { session: loaded } = await api.getSession(targetId);
-          if (active) setSession(loaded);
-        } else {
-          const { session: created } = await api.createSession({
-            title: "New Dialogue Map",
-          });
-          if (active) {
-            setSession(created);
-            await refreshSessionsList();
-          }
-        }
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          if (active) setAuthRequired(true);
-          return;
-        }
-        if (active) {
-          showError(err instanceof Error ? err.message : String(err));
-        }
-      }
-    })();
+    void api
+      .createSession({ title: "New Dialogue Map" })
+      .then(({ session: created }) => {
+        if (!active) return;
+        showSession(created);
+        void invalidateSessions();
+      })
+      .catch((err) => showError(err instanceof Error ? err.message : String(err)));
     return () => {
       active = false;
     };
-  }, [refreshSessionsList, showError, authNonce]);
+  }, [activeSessionId, sessionsQuery.data, showSession, showError]);
+
+  useEffect(() => {
+    if (sessionQuery.error && !isUnauthorized(sessionQuery.error)) {
+      showError(sessionQuery.error.message);
+    }
+  }, [sessionQuery.error, showError]);
 
   // Keep ?session= in step with the open session. Switching sessions adds a history entry,
   // so Back/Forward move between them; the first sync (no or stale id in the URL) replaces.
   useEffect(() => {
-    if (!session?.id || url.session === session.id) return;
-    setUrl({ session: session.id }, { replace: !url.session });
-  }, [session?.id]);
+    if (!activeSessionId || url.session === activeSessionId) return;
+    setUrl({ session: activeSessionId }, { replace: !url.session });
+  }, [activeSessionId]);
 
-  // Back/Forward (or an edited URL) changed ?session=: load that session.
+  // Back/Forward (or an edited URL) changed ?session=: open that session.
   useEffect(() => {
-    if (!session || !url.session || url.session === session.id) return;
-    void api
-      .getSession(url.session)
-      .then(({ session: loaded }) => setSession(loaded))
-      // Unknown id: point the URL back at the session that's open
-      .catch(() => setUrl({ session: session.id }, { replace: true }));
+    if (!activeSessionId || !url.session || url.session === activeSessionId) return;
+    if (sessions.some((s) => s.id === url.session)) setActiveSessionId(url.session);
+    // Unknown id: point the URL back at the session that's open
+    else setUrl({ session: activeSessionId }, { replace: true });
   }, [url.session]);
 
   // Live SSE Subscription for the active session
   useEffect(() => {
-    if (!session?.id) return;
+    if (!activeSessionId) return;
+    const sessionId = activeSessionId;
 
-    const unsubscribe = api.subscribeToSession(session.id, (evt) => {
+    const unsubscribe = api.subscribeToSession(sessionId, (evt) => {
+      // Session data goes into the query cache; UI-only side effects are handled here.
+      applySessionEvent(sessionId, evt);
       switch (evt.type) {
-        case "session.snapshot":
-          setSession(evt.session);
-          break;
-
-        case "session.updated":
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  title: evt.title,
-                  rootFocus: evt.rootFocus,
-                  autoMap: evt.autoMap,
-                }
-              : prev
-          );
-          void refreshSessionsList();
-          break;
-
-        case "session.audio":
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  audio: evt.audio,
-                  updatedAt: new Date().toISOString(),
-                }
-              : prev
-          );
-          break;
-
-        case "session.context_updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const hostSet = new Set(evt.hostTurnIds || []);
-            return {
-              ...prev,
-              hostContext: evt.hostContext,
-              turns:
-                hostSet.size > 0
-                  ? prev.turns.map((t) =>
-                      hostSet.has(t.id) ? { ...t, kind: "host_context" } : t
-                    )
-                  : prev.turns,
-            };
-          });
-          break;
-
-        case "speaker.updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const exists = prev.speakers.some((s) => s.id === evt.speaker.id);
-            const speakers = exists
-              ? prev.speakers.map((s) =>
-                  s.id === evt.speaker.id ? evt.speaker : s
-                )
-              : [...prev.speakers, evt.speaker].sort(
-                  (a, b) => a.channel - b.channel
-                );
-            return { ...prev, speakers };
-          });
-          break;
-
         case "transcript.partial":
           setPartialText(evt.text);
           break;
 
         case "transcript.turn":
-          setPartialText("");
-          setSession((prev) => {
-            if (!prev) return prev;
-            if (prev.turns.some((t) => t.id === evt.turn.id)) return prev;
-            return { ...prev, turns: [...prev.turns, evt.turn] };
-          });
-          break;
-
-        case "transcript.turn_updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              turns: prev.turns.map((t) =>
-                t.id === evt.turn.id ? evt.turn : t
-              ),
-            };
-          });
-          break;
-
         case "transcript.turns_batch":
           setPartialText("");
-          setSession((prev) => {
-            if (!prev) return prev;
-            const existingIds = new Set(prev.turns.map((t) => t.id));
-            const fresh = evt.turns.filter((t) => !existingIds.has(t.id));
-            return { ...prev, turns: [...prev.turns, ...fresh] };
-          });
           break;
 
         case "map.updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const activity = evt.activity
-              ? [...prev.activity.slice(-79), evt.activity]
-              : prev.activity;
-            // Mark turns referenced by nodes as mapped locally too
-            const referencedTurns = new Set<string>();
-            for (const n of evt.nodes) {
-              for (const tid of n.turnIds) referencedTurns.add(tid);
-            }
-            const turns = prev.turns.map((t) =>
-              referencedTurns.has(t.id) ? { ...t, mapped: true } : t
-            );
-            return {
-              ...prev,
-              nodes: evt.nodes,
-              crossLinks: evt.crossLinks,
-              activity,
-              turns,
-            };
-          });
           if (evt.affectedNodeIds.length > 0) {
-            const set = new Set(evt.affectedNodeIds);
-            setRecentNodeIds(set);
+            setRecentNodeIds(new Set(evt.affectedNodeIds));
             setTimeout(() => setRecentNodeIds(new Set()), 1500);
           }
-          void refreshSessionsList();
           break;
 
         case "mapper.status":
@@ -285,7 +177,7 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [session?.id, refreshSessionsList, showError]);
+  }, [activeSessionId, showError]);
 
   const stats = useMemo(
     () =>
@@ -314,8 +206,7 @@ export function App() {
     setHighlightedNodeIds(new Set());
     setActiveSpeakerFilter(null);
     setLens("all");
-    const { session: loaded } = await api.getSession(id);
-    setSession(loaded);
+    setActiveSessionId(id);
   };
 
   const handleCreateSession = async () => {
@@ -325,14 +216,17 @@ export function App() {
     const { session: created } = await api.createSession({
       title: "New Dialogue Map",
     });
-    setSession(created);
+    showSession(created);
     setSelectedNodeId(null);
-    await refreshSessionsList();
+    await invalidateSessions();
   };
 
   const handleDeleteSession = async (id: string) => {
     await api.deleteSession(id);
-    const remaining = await refreshSessionsList();
+    queryClient.removeQueries({ queryKey: queryKeys.session(id) });
+    await invalidateSessions();
+    const remaining =
+      queryClient.getQueryData<SessionSummary[]>(queryKeys.sessions) ?? [];
     if (session?.id === id && remaining[0]) {
       await handleSelectSession(remaining[0].id);
     }
@@ -380,12 +274,12 @@ export function App() {
         autoMap: session.autoMap,
       });
       targetSession = created;
-      setSession(created);
+      showSession(created);
       setSelectedNodeId(null);
       setHighlightedNodeIds(new Set());
       setActiveSpeakerFilter(null);
       setLens("all");
-      await refreshSessionsList();
+      await invalidateSessions();
     }
 
     setIsTranscribing(true);
@@ -395,7 +289,7 @@ export function App() {
         diarizationModel: targetSession.speechConfig.diarizationModel,
         autoMap: targetSession.autoMap,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -419,8 +313,8 @@ export function App() {
         autoMap: session.autoMap,
       });
       targetSession = created;
-      setSession(created);
-      await refreshSessionsList();
+      showSession(created);
+      await invalidateSessions();
     }
 
     setIsTranscribing(true);
@@ -439,7 +333,7 @@ export function App() {
         autoMap: targetSession.autoMap,
         clearExisting: !params.createNewSession && targetSession.turns.length > 0,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -460,7 +354,7 @@ export function App() {
         autoMap: session.autoMap,
         clearExisting: startSec === 0 && session.turns.length > 0,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -505,8 +399,8 @@ export function App() {
           title: "Live Demo",
         });
         targetSession = created;
-        setSession(created);
-        await refreshSessionsList();
+        showSession(created);
+        await invalidateSessions();
       }
       setSelectedNodeId(null);
       setHighlightedNodeIds(new Set());
@@ -566,9 +460,9 @@ export function App() {
             setAuthError(null);
             try {
               await api.authLogin(authTokenInput.trim());
-              setAuthRequired(false);
               setAuthTokenInput("");
-              setAuthNonce((n) => n + 1);
+              // Refetch everything that failed with 401 now that the cookie is set
+              await queryClient.invalidateQueries();
             } catch (err) {
               setAuthError(
                 err instanceof Error ? err.message : "Invalid access token"
@@ -686,10 +580,10 @@ export function App() {
                 session.id,
                 params
               );
-              setSession(updated);
+              cacheSession(updated);
               setSelectedNodeId(null);
               setHighlightedNodeIds(new Set());
-              await refreshSessionsList();
+              await invalidateSessions();
             } catch (err) {
               showError(err instanceof Error ? err.message : String(err));
             }
@@ -825,7 +719,7 @@ export function App() {
               const { session: updated } = await api.updateSession(session.id, {
                 speechConfig: patch,
               });
-              setSession(updated);
+              cacheSession(updated);
             }}
           />
         )}

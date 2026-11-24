@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import CheckCircle2 from "lucide-react/icons/circle-check";
 import Cpu from "lucide-react/icons/cpu";
 import Fingerprint from "lucide-react/icons/fingerprint-pattern";
@@ -9,12 +10,15 @@ import Trash2 from "lucide-react/icons/trash";
 import X from "lucide-react/icons/x";
 import XCircle from "lucide-react/icons/circle-x";
 import type { DialogueSession } from "@shared/schemas/models";
-import type {
-  EnrolledVoiceInfo,
-  MapperConfigInfo,
-  SpeechEngineStatus,
-} from "@shared/schemas/events";
+import type { MapperConfigInfo } from "@shared/schemas/events";
 import { api } from "@/lib/api";
+import {
+  queryClient,
+  queryKeys,
+  useMapperConfigQuery,
+  useSpeechStatusQuery,
+  useVoicesQuery,
+} from "@/lib/queries";
 
 interface SettingsModalProps {
   session: DialogueSession;
@@ -29,16 +33,17 @@ export function SettingsModal({
   onClose,
   onUpdateSpeechConfig,
 }: SettingsModalProps) {
-  const [speechStatus, setSpeechStatus] = useState<SpeechEngineStatus | null>(
-    null
-  );
-  const [mapperConfig, setMapperConfig] = useState<MapperConfigInfo | null>(
-    null
-  );
-  const [voices, setVoices] = useState<EnrolledVoiceInfo[]>([]);
-  const [warming, setWarming] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const speechStatusQuery = useSpeechStatusQuery();
+  const mapperConfigQuery = useMapperConfigQuery();
+  const voicesQuery = useVoicesQuery();
+  const speechStatus = speechStatusQuery.data ?? null;
+  const mapperConfig = mapperConfigQuery.data ?? null;
+  const voices = voicesQuery.data ?? [];
+  const [actionError, setActionError] = useState<string | null>(null);
+  const loadError =
+    speechStatusQuery.error ?? mapperConfigQuery.error ?? voicesQuery.error;
+  const error = actionError ?? (loadError ? loadError.message : null);
+  const onActionError = (err: Error) => setActionError(err.message);
 
   const [mode, setMode] = useState<MapperConfigInfo["mode"]>("llm");
   const [provider, setProvider] =
@@ -47,64 +52,59 @@ export function SettingsModal({
   const [model, setModel] = useState("sonnet");
   const [apiKey, setApiKey] = useState("");
 
-  const loadAll = async () => {
-    try {
-      const [s, m, v] = await Promise.all([
-        api.getSpeechStatus(),
-        api.getMapperConfig(),
-        api.listVoices(),
-      ]);
-      setSpeechStatus(s);
-      setMapperConfig(m);
-      setVoices(v.voices);
-      setMode(m.mode);
-      setProvider(m.provider);
-      setBaseUrl(m.baseUrl);
-      setModel(m.model);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  // Fill the mapper form once the saved config loads (and again after a save)
+  useEffect(() => {
+    if (!mapperConfig) return;
+    setMode(mapperConfig.mode);
+    setProvider(mapperConfig.provider);
+    setBaseUrl(mapperConfig.baseUrl);
+    setModel(mapperConfig.model);
+  }, [mapperConfig]);
+
+  const refreshAll = () => {
+    setActionError(null);
+    void speechStatusQuery.refetch();
+    void mapperConfigQuery.refetch();
+    void voicesQuery.refetch();
   };
 
-  useEffect(() => {
-    void loadAll();
-  }, []);
-
-  const handleWarmServer = async () => {
-    setWarming(true);
-    setError(null);
-    try {
-      const next = await api.startSpeechServer({
+  const warmServer = useMutation({
+    mutationFn: () =>
+      api.startSpeechServer({
         asrModel: session.speechConfig.streamingAsrModel,
         diarModel: session.speechConfig.diarizationModel,
-      });
-      setSpeechStatus(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setWarming(false);
-    }
-  };
+      }),
+    onMutate: () => setActionError(null),
+    onSuccess: (status) => queryClient.setQueryData(queryKeys.speechStatus, status),
+    onError: onActionError,
+  });
 
-  const handleSaveMapper = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await api.updateMapperConfig({
+  const saveMapper = useMutation({
+    mutationFn: () =>
+      api.updateMapperConfig({
         mode,
         provider: mode === "heuristic" ? "heuristic" : provider,
         baseUrl,
         model,
         apiKey: apiKey.trim() || undefined,
-      });
-      setMapperConfig(updated);
+      }),
+    onMutate: () => setActionError(null),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.mapperConfig, updated);
       setApiKey("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
+    },
+    onError: onActionError,
+  });
+
+  const deleteVoice = useMutation({
+    mutationFn: (id: string) => api.deleteVoice(id),
+    onSuccess: (res) => queryClient.setQueryData(queryKeys.voices, res.voices),
+    onError: onActionError,
+  });
+
+  const handleSaveMapper = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveMapper.mutate();
   };
 
   return (
@@ -144,7 +144,7 @@ export function SettingsModal({
               </div>
               <button
                 type="button"
-                onClick={() => void loadAll()}
+                onClick={refreshAll}
                 className="inline-flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-900"
               >
                 <RefreshCw className="w-3 h-3" /> Refresh
@@ -180,12 +180,12 @@ export function SettingsModal({
                   {!speechStatus.serverRunning && speechStatus.installed && (
                     <button
                       type="button"
-                      disabled={warming}
-                      onClick={handleWarmServer}
+                      disabled={warmServer.isPending}
+                      onClick={() => warmServer.mutate()}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900 text-white font-semibold hover:bg-stone-800 disabled:opacity-50"
                     >
                       <Play className="w-3 h-3 fill-current" />
-                      {warming ? "Starting…" : "Pre-warm Live Server"}
+                      {warmServer.isPending ? "Starting…" : "Pre-warm Live Server"}
                     </button>
                   )}
                 </div>
@@ -434,10 +434,10 @@ export function SettingsModal({
                 </span>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saveMapper.isPending}
                   className="px-3.5 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {saving ? "Saving…" : "Save Mapper Config"}
+                  {saveMapper.isPending ? "Saving…" : "Save Mapper Config"}
                 </button>
               </div>
             </form>
@@ -474,10 +474,8 @@ export function SettingsModal({
                       </div>
                       <button
                         type="button"
-                        onClick={async () => {
-                          const res = await api.deleteVoice(v.id);
-                          setVoices(res.voices);
-                        }}
+                        disabled={deleteVoice.isPending}
+                        onClick={() => deleteVoice.mutate(v.id)}
                         className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-50"
                         title="Remove enrolled voice"
                       >
