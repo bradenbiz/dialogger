@@ -321,8 +321,10 @@ export class DialogueMapperEngine {
       if (this.config.model) {
         args.push("--model", this.config.model);
       }
-      args.push(combinedPrompt);
-      rawText = await runCli("codex", args);
+      // `-` makes codex read the whole prompt from stdin (with a prompt argument, piped
+      // stdin would be appended as an extra block). Keeps long sessions under argv limits.
+      args.push("-");
+      rawText = await runCli("codex", args, combinedPrompt);
     } else if (this.config.provider === "anthropic") {
       const url = `${this.config.baseUrl.replace(/\/$/, "")}/messages`;
       const res = await fetch(url, {
