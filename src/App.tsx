@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import {
   applySessionEvent,
   cacheSession,
+  forgetSession,
   invalidateSessions,
   isUnauthorized,
   useSession,
@@ -117,7 +118,8 @@ export function App() {
     const err = sessionQuery.error;
     if (!err || isUnauthorized(err)) return;
     showError(err.message);
-    if (session && session.id !== activeSessionId) {
+    if (session && activeSessionId && session.id !== activeSessionId) {
+      forgetSession(activeSessionId);
       setUrl({ session: session.id }, { replace: true });
       setActiveSessionId(session.id);
       void invalidateSessions();

@@ -65,6 +65,14 @@ export function cacheSession(session: DialogueSession): void {
   void mutate(keys.session(session.id), session, { revalidate: false });
 }
 
+/**
+ * Drops a session's cache entry, error included. Without this, opening a session that failed
+ * to load would show the old error again at once, before the new attempt even starts.
+ */
+export function forgetSession(id: string): void {
+  void mutate(keys.session(id), undefined, { revalidate: false });
+}
+
 /** Refetches the session list; resolves to the fresh list. */
 export function invalidateSessions(): Promise<SessionSummary[] | undefined> {
   return mutate<SessionSummary[]>(keys.sessions);
