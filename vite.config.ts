@@ -54,6 +54,11 @@ export default defineConfig(({ command }) => {
       alias: {
         "@shared": path.resolve(import.meta.dirname, "shared"),
         "@": path.resolve(import.meta.dirname, "src"),
+        // React 19 has useSyncExternalStore built in; skip SWR's polyfill
+        "use-sync-external-store/shim": path.resolve(
+          import.meta.dirname,
+          "src/lib/use-sync-external-store-shim.ts"
+        ),
       },
     },
     server: {

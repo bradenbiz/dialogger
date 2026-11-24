@@ -1,17 +1,9 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import Activity from "lucide-react/icons/activity";
 import BookOpen from "lucide-react/icons/book-open";
 import type { DialogueSession, IBISNode, IBISNodeType } from "@shared/schemas/models";
 import { Skeleton } from "@/components/Skeleton";
-
-// The editor only shows once a node is selected, so it loads separately from the main bundle.
-// It's prefetched once the browser is idle; after that it renders directly, because a lazy()
-// component suspends on its first render even when its code is ready, and React keeps a
-// shown fallback up for ~300ms.
-let loadedNodeEditor: typeof import("./NodeEditor") | undefined;
-const loadNodeEditor = () =>
-  import("./NodeEditor").then((m) => (loadedNodeEditor = m));
-const LazyNodeEditor = lazy(() => loadNodeEditor().then((m) => ({ default: m.NodeEditor })));
+import { NodeEditor, preloadNodeEditor } from "@/components/panels";
 
 interface NodeInspectorProps {
   /** Undefined while the session loads: the activity feed shows skeleton rows. */
@@ -38,15 +30,6 @@ export function NodeInspector({
   onFocusTurn,
   onSelectNode,
 }: NodeInspectorProps) {
-  useEffect(() => {
-    if ("requestIdleCallback" in window) {
-      const id = requestIdleCallback(() => void loadNodeEditor());
-      return () => cancelIdleCallback(id);
-    }
-    const id = setTimeout(() => void loadNodeEditor(), 2000);
-    return () => clearTimeout(id);
-  }, []);
-
   // When no node is selected, show a compact Conklin Live Activity & Grammar Drawer
   if (!selectedNode || !session) {
     return (
@@ -111,6 +94,7 @@ export function NodeInspector({
             [...session.activity].reverse().map((act) => (
               <div
                 key={act.id}
+                {...(act.affectedNodeIds?.[0] ? preloadNodeEditor : {})}
                 onClick={() => {
                   if (act.affectedNodeIds?.[0]) {
                     onSelectNode(act.affectedNodeIds[0]);
@@ -141,7 +125,6 @@ export function NodeInspector({
     );
   }
 
-  const NodeEditor = loadedNodeEditor?.NodeEditor ?? LazyNodeEditor;
   return (
     <Suspense fallback={<NodeEditorSkeleton />}>
       <NodeEditor

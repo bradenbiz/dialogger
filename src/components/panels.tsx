@@ -1,33 +1,33 @@
-import { lazy } from "react";
 import type { Panel } from "@/lib/url-state";
+import { lazyWithPreload } from "@/lib/lazy";
 
-// Each panel's code (modal + its icons) is its own chunk, fetched when the panel is first
-// opened, or earlier when the user hovers or focuses a button that opens it.
-const loaders = {
-  agent: () => import("./AgentModal"),
-  settings: () => import("./SettingsModal"),
-  youtube: () => import("./YouTubeModal"),
-} satisfies Record<Panel, () => Promise<unknown>>;
+// Every dialog, panel, and page that isn't on screen at first paint is its own chunk (the
+// component plus its icons), fetched when it's first shown, or earlier when the user hovers or
+// focuses a control that opens it. Once fetched, it renders without a Suspense fallback.
 
-export const AgentModal = lazy(() =>
-  loaders.agent().then((m) => ({ default: m.AgentModal }))
-);
-export const SettingsModal = lazy(() =>
-  loaders.settings().then((m) => ({ default: m.SettingsModal }))
-);
-export const YouTubeModal = lazy(() =>
-  loaders.youtube().then((m) => ({ default: m.YouTubeModal }))
-);
+// URL panels (?panel=…): buttons that open one spread `preloadOnIntent(panel)`
+const panels = {
+  agent: lazyWithPreload(() => import("./AgentModal").then((m) => m.AgentModal)),
+  settings: lazyWithPreload(() => import("./SettingsModal").then((m) => m.SettingsModal)),
+  youtube: lazyWithPreload(() => import("./YouTubeModal").then((m) => m.YouTubeModal)),
+} satisfies Record<Panel, { preloadOnIntent: object }>;
 
-/** Start fetching a panel's chunk (the browser caches the module, so repeats are free). */
-export function preloadPanel(panel: Panel) {
-  void loaders[panel]();
-}
+export const AgentModal = panels.agent.Component;
+export const SettingsModal = panels.settings.Component;
+export const YouTubeModal = panels.youtube.Component;
 
 /** Props for a button that opens `panel`: preload on hover or keyboard focus. */
 export function preloadOnIntent(panel: Panel) {
-  return {
-    onMouseEnter: () => preloadPanel(panel),
-    onFocus: () => preloadPanel(panel),
-  };
+  return panels[panel].preloadOnIntent;
 }
+
+// The node editor replaces the activity feed once a node is selected. Controls that select a
+// node spread `preloadNodeEditor`.
+export const { Component: NodeEditor, preloadOnIntent: preloadNodeEditor } = lazyWithPreload(
+  () => import("./NodeEditor").then((m) => m.NodeEditor)
+);
+
+// The sign-in screen only shows after a 401, so nothing preloads it
+export const { Component: SignInScreen } = lazyWithPreload(() =>
+  import("./SignInScreen").then((m) => m.SignInScreen)
+);

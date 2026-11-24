@@ -26,7 +26,7 @@ function formatClock(sec: number): string {
   return `${m}:${String(rem).padStart(2, "0")}`;
 }
 
-function parseClock(raw: string): number | null {
+export function parseClock(raw: string): number | null {
   const t = raw.trim();
   if (!t) return null;
   if (/^\d+(?:\.\d+)?$/.test(t)) return Number(t);

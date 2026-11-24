@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Bot from "lucide-react/icons/bot";
 import ChevronDown from "lucide-react/icons/chevron-down";
 import Download from "lucide-react/icons/download";
@@ -6,16 +6,20 @@ import FileAudio from "lucide-react/icons/file-headphone";
 import Mic from "lucide-react/icons/mic";
 import MicOff from "lucide-react/icons/mic-off";
 import Play from "lucide-react/icons/play";
-import Plus from "lucide-react/icons/plus";
 import Settings from "lucide-react/icons/settings";
 import Square from "lucide-react/icons/square";
-import Trash2 from "lucide-react/icons/trash";
 import Upload from "lucide-react/icons/upload";
 import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
 import { preloadOnIntent } from "@/components/panels";
 import { Skeleton } from "@/components/Skeleton";
+import { lazyWithPreload } from "@/lib/lazy";
+
+// The session switcher only shows once opened; it loads on hover or focus
+const { Component: SessionMenu, preloadOnIntent: preloadSessionMenu } = lazyWithPreload(() =>
+  import("./SessionMenu").then((m) => m.SessionMenu)
+);
 
 /** The exporters only load when the user picks one from the Export menu. */
 const loadExport = () => import("@/lib/export");
@@ -121,6 +125,7 @@ export function TopBar({
                 setEditingTitle(true);
               }}
               onClick={() => setSessionsOpen((v) => !v)}
+              {...preloadSessionMenu}
               title="Click to switch sessions · Double-click to rename"
               className="flex items-center gap-1.5 text-sm font-medium text-stone-800 hover:text-stone-950 hover:bg-stone-100 px-2 py-1 rounded-md transition truncate max-w-[260px]"
             >
@@ -134,70 +139,16 @@ export function TopBar({
           )}
 
           {sessionsOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setSessionsOpen(false)}
+            <Suspense fallback={null}>
+              <SessionMenu
+                sessions={sessions}
+                activeSessionId={session?.id}
+                onSelect={onSelectSession}
+                onCreate={onCreateSession}
+                onDelete={onDeleteSession}
+                onClose={() => setSessionsOpen(false)}
               />
-              <div className="absolute left-0 top-10 w-80 bg-white border border-stone-200 rounded-xl shadow-lg py-1.5 z-40">
-                <div className="px-3 py-1.5 flex items-center justify-between border-b border-stone-100">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
-                    Sessions
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSessionsOpen(false);
-                      onCreateSession();
-                    }}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-800"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> New
-                  </button>
-                </div>
-                <div className="max-h-72 overflow-y-auto py-1">
-                  {!sessions &&
-                    [0, 1, 2].map((i) => (
-                      <div key={i} className="px-3 py-2 space-y-1.5">
-                        <Skeleton className="block w-40 h-3.5" />
-                        <Skeleton className="block w-28 h-2.5" />
-                      </div>
-                    ))}
-                  {sessions?.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`group flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-stone-50 ${
-                        s.id === session?.id ? "bg-blue-50/70 text-blue-900" : "text-stone-700"
-                      }`}
-                      onClick={() => {
-                        setSessionsOpen(false);
-                        onSelectSession(s.id);
-                      }}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="font-medium truncate">{s.title}</div>
-                        <div className="text-[11px] text-stone-400">
-                          {s.nodeCount} nodes · {s.turnCount} turns · {s.speakerCount} speakers
-                        </div>
-                      </div>
-                      {sessions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteSession(s.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-rose-600 rounded"
-                          title="Delete session"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
+            </Suspense>
           )}
         </div>
 

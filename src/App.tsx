@@ -12,7 +12,6 @@ import {
   cacheSession,
   invalidateSessions,
   isUnauthorized,
-  revalidateAll,
   useSession,
   useSessions,
 } from "@/lib/queries";
@@ -29,7 +28,7 @@ import {
   DialogueMapCanvasPlaceholder,
 } from "@/components/DialogueMapCanvas";
 import { NodeInspector } from "@/components/NodeInspector";
-import { AgentModal, SettingsModal, YouTubeModal } from "@/components/panels";
+import { AgentModal, SettingsModal, SignInScreen, YouTubeModal } from "@/components/panels";
 import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
 
 export function App() {
@@ -67,8 +66,6 @@ export function App() {
 
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{ sec: number; nonce: number } | null>(null);
-  const [authTokenInput, setAuthTokenInput] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
   const authRequired =
     isUnauthorized(sessionsQuery.error) || isUnauthorized(sessionQuery.error);
 
@@ -453,51 +450,9 @@ export function App() {
 
   if (authRequired) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#FAF9F6] p-4">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setAuthError(null);
-            try {
-              await api.authLogin(authTokenInput.trim());
-              setAuthTokenInput("");
-              // Refetch everything that failed with 401 now that the cookie is set
-              await revalidateAll();
-            } catch (err) {
-              setAuthError(
-                err instanceof Error ? err.message : "Invalid access token"
-              );
-            }
-          }}
-          className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-sm p-6 space-y-4"
-        >
-          <div>
-            <h1 className="font-display text-lg font-semibold text-stone-900">
-              Sign in to Dialogger
-            </h1>
-            <p className="text-xs text-stone-500 mt-1">
-              Enter the server&apos;s <code className="font-mono-code">DIALOGGER_API_KEY</code> to access sessions, audio, and live mapping.
-            </p>
-          </div>
-          <input
-            type="password"
-            value={authTokenInput}
-            onChange={(e) => setAuthTokenInput(e.target.value)}
-            placeholder="Access token"
-            autoFocus
-            className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-blue-500"
-          />
-          {authError && (
-            <div className="text-xs text-rose-600 font-medium">{authError}</div>
-          )}
-          <button
-            type="submit"
-            className="w-full py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 transition"
-          >
-            Unlock
-          </button>
-        </form>
-      </div>
+      <Suspense fallback={<div className="w-screen h-screen bg-[#FAF9F6]" />}>
+        <SignInScreen />
+      </Suspense>
     );
   }
 

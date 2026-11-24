@@ -14,7 +14,7 @@ import {
 } from "@shared/schemas/models";
 import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN, type ConklinMapStats } from "@shared/ibis";
 import { computeDialogueMapLayout, type PositionedNode } from "@/lib/layout";
-import { preloadOnIntent } from "@/components/panels";
+import { preloadNodeEditor, preloadOnIntent } from "@/components/panels";
 import type { FacilitationLens } from "./ConklinMetrics";
 
 interface DialogueMapCanvasProps {
@@ -506,6 +506,7 @@ function IBISNodeCard({
   return (
     <div
       data-ibis-node={node.id}
+      {...preloadNodeEditor}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
