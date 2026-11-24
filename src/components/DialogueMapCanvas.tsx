@@ -14,7 +14,7 @@ import {
 } from "@shared/schemas/models";
 import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN, type ConklinMapStats } from "@shared/ibis";
 import { computeDialogueMapLayout, type PositionedNode } from "@/lib/layout";
-import { preloadOnIntent } from "@/components/panels";
+import { preloadNodeEditor, preloadOnIntent } from "@/components/panels";
 import type { FacilitationLens } from "./ConklinMetrics";
 
 interface DialogueMapCanvasProps {
@@ -30,6 +30,14 @@ interface DialogueMapCanvasProps {
   onStartDemo: () => void;
   onTriggerUpload: () => void;
   onOpenYouTube: () => void;
+}
+
+/**
+ * The map surface while its session loads: the empty dot grid, with no nodes and no
+ * get-started card (which would flash for a session that does have nodes).
+ */
+export function DialogueMapCanvasPlaceholder() {
+  return <div className="flex-1 relative overflow-hidden canvas-dot-grid" aria-busy="true" />;
 }
 
 export function DialogueMapCanvas({
@@ -498,6 +506,7 @@ function IBISNodeCard({
   return (
     <div
       data-ibis-node={node.id}
+      {...preloadNodeEditor}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();

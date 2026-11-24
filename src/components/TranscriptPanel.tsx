@@ -1,22 +1,75 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import AudioLines from "lucide-react/icons/audio-lines";
 import Check from "lucide-react/icons/check";
 import ChevronDown from "lucide-react/icons/chevron-down";
 import Edit3 from "lucide-react/icons/pen-line";
 import ExternalLink from "lucide-react/icons/external-link";
 import Layers from "lucide-react/icons/layers";
-import Play from "lucide-react/icons/play";
-import Plus from "lucide-react/icons/plus";
-import Scissors from "lucide-react/icons/scissors";
 import Send from "lucide-react/icons/send";
 import Sparkles from "lucide-react/icons/sparkles";
-import Square from "lucide-react/icons/square";
 import UploadCloud from "lucide-react/icons/cloud-upload";
 import Users from "lucide-react/icons/users";
 import Volume2 from "lucide-react/icons/volume-2";
 import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
 import { formatTime } from "@/lib/format";
-import { AudioScrubber } from "./AudioScrubber";
+import { Skeleton } from "@/components/Skeleton";
+import { lazyWithPreload } from "@/lib/lazy";
+import { preloadNodeEditor } from "@/components/panels";
+
+// The audio controls only show for sessions with audio, so they load separately from the main bundle
+const { Component: SessionAudioControls } = lazyWithPreload(() =>
+  import("./SessionAudioControls").then((m) => m.SessionAudioControls)
+);
+
+// The speaker menu only shows once a turn's speaker is clicked; it loads on hover or focus
+const { Component: SpeakerMenu, preloadOnIntent: preloadSpeakerMenu } = lazyWithPreload(() =>
+  import("./SpeakerMenu").then((m) => m.SpeakerMenu)
+);
+
+/** Same size as SessionAudioControls with the trim form closed: scrubber, then the button row. */
+function SessionAudioControlsSkeleton() {
+  return (
+    <>
+      <Skeleton className="block w-full h-[79px] rounded-lg" />
+      <div className="pt-0.5">
+        <Skeleton className="block w-44 h-[26px] rounded-lg" />
+      </div>
+    </>
+  );
+}
+
+const PANEL_CLASS =
+  "w-[360px] xl:w-[400px] border-r border-stone-200/90 bg-white flex flex-col shrink-0 relative";
+
+/** The transcript panel while its session loads: the real header, with skeleton turns. */
+export function TranscriptPanelSkeleton() {
+  return (
+    <aside className={PANEL_CLASS} aria-busy="true">
+      <div className="px-4 py-3 border-b border-stone-200/80 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <AudioLines className="w-4 h-4 text-stone-500" />
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+            Diarized Transcript
+          </h2>
+          <Skeleton className="w-5 h-3" />
+        </div>
+        <Skeleton className="w-16 h-3" />
+      </div>
+      <div className="flex-1 p-3 space-y-3 overflow-hidden">
+        {["w-11/12", "w-2/3", "w-full", "w-3/5"].map((w, i) => (
+          <div key={i} className="rounded-xl border border-stone-100 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Skeleton className="w-20 h-3" />
+              <Skeleton className="w-10 h-3" />
+            </div>
+            <Skeleton className="block w-full h-3" />
+            <Skeleton className={`block ${w} h-3`} />
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
 
 interface TranscriptPanelProps {
   session: DialogueSession;
@@ -76,25 +129,7 @@ export function TranscriptPanel({
   const [manualText, setManualText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [playheadSec, setPlayheadSec] = useState(0);
   const [speakerMenuTurnId, setSpeakerMenuTurnId] = useState<string | null>(null);
-  const [newSpeakerDraft, setNewSpeakerDraft] = useState("");
-  const [showTrimPanel, setShowTrimPanel] = useState(false);
-  const [trimStartInput, setTrimStartInput] = useState("0:00");
-  const [trimEndInput, setTrimEndInput] = useState("");
-  const [trimClearMap, setTrimClearMap] = useState(true);
-  const [trimming, setTrimming] = useState(false);
-
-  const parseTimestampInput = (raw: string): number | undefined => {
-    const t = raw.trim();
-    if (!t) return undefined;
-    if (/^\d+(?:\.\d+)?$/.test(t)) return Number(t);
-    const parts = t.split(":").map((p) => Number(p));
-    if (parts.some((n) => !Number.isFinite(n) || n < 0)) return undefined;
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    return undefined;
-  };
 
   const listEndRef = useRef<HTMLDivElement>(null);
   const turnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -159,7 +194,7 @@ export function TranscriptPanel({
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`w-[360px] xl:w-[400px] border-r border-stone-200/90 bg-white flex flex-col shrink-0 relative transition ${
+      className={`${PANEL_CLASS} transition ${
         dragOver ? "ring-2 ring-inset ring-blue-500 bg-blue-50/30" : ""
       }`}
     >
@@ -222,163 +257,18 @@ export function TranscriptPanel({
               </a>
             )}
           </div>
-          <AudioScrubber
-            src={`/api/sessions/${encodeURIComponent(session.id)}/audio?v=${encodeURIComponent(session.updatedAt)}`}
-            durationHintSec={session.audio.durationSec}
-            seekRequest={seekRequest}
-            onTimeUpdate={onAudioTimeUpdate}
-            onPlayheadChange={setPlayheadSec}
-          />
-          <div className="flex items-center justify-between gap-2 pt-0.5">
-            {isTranscribing ? (
-              <button
-                type="button"
-                onClick={onStopTranscribing}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-semibold hover:bg-rose-700 transition"
-              >
-                <Square className="w-3 h-3 fill-current" />
-                Stop Diarizing
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => onTranscribeSavedAudio(0)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900 text-white text-[11px] font-semibold hover:bg-stone-800 transition"
-                >
-                  <Play className="w-3 h-3 fill-current text-amber-400" />
-                  {session.turns.length > 0
-                    ? "Re-diarize & Map from 0:00"
-                    : "Diarize & Map Audio"}
-                </button>
-                {playheadSec >= 3 && (
-                  <button
-                    type="button"
-                    onClick={() => onTranscribeSavedAudio(Math.floor(playheadSec))}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-stone-200 text-stone-700 text-[11px] font-medium hover:bg-stone-100 transition"
-                    title="Start diarizing and mapping from the current audio playhead position"
-                  >
-                    From {formatTime(playheadSec)}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!showTrimPanel && playheadSec > 0) {
-                      setTrimStartInput(formatTime(playheadSec));
-                    }
-                    setTrimClearMap(session.turns.length > 0);
-                    setShowTrimPanel((v) => !v);
-                  }}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-medium transition ${
-                    showTrimPanel
-                      ? "bg-stone-900 text-white border-stone-900"
-                      : "bg-white border-stone-200 text-stone-700 hover:bg-stone-100"
-                  }`}
-                  title="Clip/trim intro or outro from the saved audio file"
-                >
-                  <Scissors className="w-3 h-3" />
-                  Trim
-                </button>
-              </div>
-            )}
-          </div>
-
-          {showTrimPanel && !isTranscribing && (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const s = parseTimestampInput(trimStartInput);
-                const end = parseTimestampInput(trimEndInput);
-                if (s === undefined) return;
-                setTrimming(true);
-                try {
-                  await onTrimAudio({
-                    startSec: s,
-                    endSec: end,
-                    clearTranscriptAndMap: trimClearMap,
-                  });
-                  setShowTrimPanel(false);
-                  setTrimStartInput("0:00");
-                  setTrimEndInput("");
-                  setPlayheadSec(0);
-                } finally {
-                  setTrimming(false);
-                }
-              }}
-              className="mt-2 p-2.5 rounded-xl bg-white border border-stone-200 space-y-2 text-[11px]"
-            >
-              <div className="font-semibold text-stone-700">
-                Clip Audio (remove marketing intro / outro)
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <div className="flex items-center justify-between text-[10px] text-stone-400 mb-0.5">
-                    <span>Start (m:ss)</span>
-                    <button
-                      type="button"
-                      onClick={() => setTrimStartInput(formatTime(playheadSec))}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      Use {formatTime(playheadSec)}
-                    </button>
-                  </div>
-                  <input
-                    value={trimStartInput}
-                    onChange={(e) => setTrimStartInput(e.target.value)}
-                    placeholder="e.g. 2:15"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 font-mono-code text-xs"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-[10px] text-stone-400 mb-0.5">
-                    <span>End (optional)</span>
-                    <button
-                      type="button"
-                      onClick={() => setTrimEndInput(formatTime(playheadSec))}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      Use {formatTime(playheadSec)}
-                    </button>
-                  </div>
-                  <input
-                    value={trimEndInput}
-                    onChange={(e) => setTrimEndInput(e.target.value)}
-                    placeholder="End of file"
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 font-mono-code text-xs"
-                  />
-                </div>
-              </div>
-              {session.turns.length > 0 && (
-                <label className="flex items-center gap-1.5 text-[11px] text-stone-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={trimClearMap}
-                    onChange={(e) => setTrimClearMap(e.target.checked)}
-                    className="rounded border-stone-300 text-blue-600"
-                  />
-                  Reset transcript &amp; map after trimming
-                </label>
-              )}
-              <div className="flex items-center justify-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowTrimPanel(false)}
-                  className="px-2 py-1 rounded-lg text-stone-500 hover:bg-stone-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={trimming}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-900 text-white font-semibold hover:bg-stone-800 disabled:opacity-50"
-                >
-                  <Scissors className="w-3 h-3" />
-                  {trimming ? "Trimming…" : "Trim Audio"}
-                </button>
-              </div>
-            </form>
-          )}
+          <Suspense fallback={<SessionAudioControlsSkeleton />}>
+            <SessionAudioControls
+              session={session}
+              audio={session.audio}
+              seekRequest={seekRequest}
+              isTranscribing={isTranscribing}
+              onAudioTimeUpdate={onAudioTimeUpdate}
+              onTranscribeSavedAudio={onTranscribeSavedAudio}
+              onTrimAudio={onTrimAudio}
+              onStopTranscribing={onStopTranscribing}
+            />
+          </Suspense>
         </div>
       )}
 
@@ -535,6 +425,7 @@ export function TranscriptPanel({
                   if (el) turnRefs.current.set(turn.id, el);
                   else turnRefs.current.delete(turn.id);
                 }}
+                {...(linkedNodes > 0 ? preloadNodeEditor : {})}
                 onClick={() => onSelectTurn(turn)}
                 className={`group rounded-xl p-2.5 border cursor-pointer transition ${
                   isPlayingNow
@@ -548,9 +439,9 @@ export function TranscriptPanel({
                   <div className="relative flex items-center gap-1.5 min-w-0">
                     <button
                       type="button"
+                      {...preloadSpeakerMenu}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setNewSpeakerDraft("");
                         setSpeakerMenuTurnId((prev) =>
                           prev === turn.id ? null : turn.id
                         );
@@ -569,83 +460,14 @@ export function TranscriptPanel({
                     </button>
 
                     {speakerMenuTurnId === turn.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSpeakerMenuTurnId(null);
-                          }}
+                      <Suspense fallback={null}>
+                        <SpeakerMenu
+                          speakers={session.speakers}
+                          speakerId={turn.speakerId}
+                          onAssign={(patch) => onReassignTurnSpeaker(turn.id, patch)}
+                          onClose={() => setSpeakerMenuTurnId(null)}
                         />
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute left-0 top-7 w-56 bg-white border border-stone-200 rounded-xl shadow-lg py-1.5 z-40"
-                        >
-                          <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400">
-                            Assign speaker
-                          </div>
-                          <div className="max-h-44 overflow-y-auto">
-                            {session.speakers.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => {
-                                  onReassignTurnSpeaker(turn.id, {
-                                    speakerId: s.id,
-                                  });
-                                  setSpeakerMenuTurnId(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-stone-50 text-left ${
-                                  s.id === turn.speakerId
-                                    ? "bg-blue-50/70 font-semibold text-blue-900"
-                                    : "text-stone-700"
-                                }`}
-                              >
-                                <span className="inline-flex items-center gap-2 min-w-0">
-                                  <span
-                                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                                    style={{ backgroundColor: s.color }}
-                                  />
-                                  <span className="truncate">{s.name}</span>
-                                </span>
-                                {s.id === turn.speakerId && (
-                                  <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                          <form
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              const name = newSpeakerDraft.trim();
-                              if (!name) return;
-                              onReassignTurnSpeaker(turn.id, {
-                                speakerName: name,
-                              });
-                              setNewSpeakerDraft("");
-                              setSpeakerMenuTurnId(null);
-                            }}
-                            className="mt-1 pt-1.5 px-2 border-t border-stone-100 flex items-center gap-1"
-                          >
-                            <input
-                              value={newSpeakerDraft}
-                              onChange={(e) =>
-                                setNewSpeakerDraft(e.target.value)
-                              }
-                              placeholder="New speaker name…"
-                              className="flex-1 text-xs bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 outline-none focus:bg-white focus:border-blue-400"
-                            />
-                            <button
-                              type="submit"
-                              disabled={!newSpeakerDraft.trim()}
-                              className="p-1 rounded-lg bg-stone-900 text-white hover:bg-stone-800 disabled:opacity-40"
-                              title="Create and assign new speaker"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </form>
-                        </div>
-                      </>
+                      </Suspense>
                     )}
 
                     {spk?.role && (

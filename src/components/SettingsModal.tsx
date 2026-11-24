@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useSWRMutation from "swr/mutation";
 import CheckCircle2 from "lucide-react/icons/circle-check";
 import Cpu from "lucide-react/icons/cpu";
 import Fingerprint from "lucide-react/icons/fingerprint-pattern";
@@ -9,12 +10,10 @@ import Trash2 from "lucide-react/icons/trash";
 import X from "lucide-react/icons/x";
 import XCircle from "lucide-react/icons/circle-x";
 import type { DialogueSession } from "@shared/schemas/models";
-import type {
-  EnrolledVoiceInfo,
-  MapperConfigInfo,
-  SpeechEngineStatus,
-} from "@shared/schemas/events";
+import type { MapperConfigInfo } from "@shared/schemas/events";
 import { api } from "@/lib/api";
+import { keys, useMapperConfig, useSpeechStatus, useVoices } from "@/lib/queries";
+import { Skeleton } from "@/components/Skeleton";
 
 interface SettingsModalProps {
   session: DialogueSession;
@@ -29,16 +28,21 @@ export function SettingsModal({
   onClose,
   onUpdateSpeechConfig,
 }: SettingsModalProps) {
-  const [speechStatus, setSpeechStatus] = useState<SpeechEngineStatus | null>(
-    null
-  );
-  const [mapperConfig, setMapperConfig] = useState<MapperConfigInfo | null>(
-    null
-  );
-  const [voices, setVoices] = useState<EnrolledVoiceInfo[]>([]);
-  const [warming, setWarming] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const speechStatusQuery = useSpeechStatus();
+  const mapperConfigQuery = useMapperConfig();
+  const voicesQuery = useVoices();
+  // Each is undefined until it loads (skeletons stand in; see AGENTS.md)
+  const speechStatus = speechStatusQuery.data;
+  const mapperConfig = mapperConfigQuery.data;
+  const voices = voicesQuery.data;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const loadError =
+    speechStatusQuery.error ?? mapperConfigQuery.error ?? voicesQuery.error;
+  const error = actionError ?? (loadError ? loadError.message : null);
+  // Mutation results go straight into the matching cache entry (populateCache); errors are
+  // shown in the modal instead of thrown
+  const onActionError = (err: Error) => setActionError(err.message);
+  const mutationOptions = { revalidate: false, throwOnError: false, onError: onActionError };
 
   const [mode, setMode] = useState<MapperConfigInfo["mode"]>("llm");
   const [provider, setProvider] =
@@ -47,64 +51,55 @@ export function SettingsModal({
   const [model, setModel] = useState("sonnet");
   const [apiKey, setApiKey] = useState("");
 
-  const loadAll = async () => {
-    try {
-      const [s, m, v] = await Promise.all([
-        api.getSpeechStatus(),
-        api.getMapperConfig(),
-        api.listVoices(),
-      ]);
-      setSpeechStatus(s);
-      setMapperConfig(m);
-      setVoices(v.voices);
-      setMode(m.mode);
-      setProvider(m.provider);
-      setBaseUrl(m.baseUrl);
-      setModel(m.model);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  // Fill the mapper form once the saved config loads (and again after a save)
+  useEffect(() => {
+    if (!mapperConfig) return;
+    setMode(mapperConfig.mode);
+    setProvider(mapperConfig.provider);
+    setBaseUrl(mapperConfig.baseUrl);
+    setModel(mapperConfig.model);
+  }, [mapperConfig]);
+
+  const refreshAll = () => {
+    setActionError(null);
+    void speechStatusQuery.mutate();
+    void mapperConfigQuery.mutate();
+    void voicesQuery.mutate();
   };
 
-  useEffect(() => {
-    void loadAll();
-  }, []);
-
-  const handleWarmServer = async () => {
-    setWarming(true);
-    setError(null);
-    try {
-      const next = await api.startSpeechServer({
+  const warmServer = useSWRMutation(
+    keys.speechStatus,
+    () =>
+      api.startSpeechServer({
         asrModel: session.speechConfig.streamingAsrModel,
         diarModel: session.speechConfig.diarizationModel,
-      });
-      setSpeechStatus(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setWarming(false);
-    }
-  };
+      }),
+    { ...mutationOptions, populateCache: true }
+  );
 
-  const handleSaveMapper = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await api.updateMapperConfig({
+  const saveMapper = useSWRMutation(
+    keys.mapperConfig,
+    () =>
+      api.updateMapperConfig({
         mode,
         provider: mode === "heuristic" ? "heuristic" : provider,
         baseUrl,
         model,
         apiKey: apiKey.trim() || undefined,
-      });
-      setMapperConfig(updated);
-      setApiKey("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
+      }),
+    { ...mutationOptions, populateCache: true, onSuccess: () => setApiKey("") }
+  );
+
+  const deleteVoice = useSWRMutation(
+    keys.voices,
+    (_key, { arg: id }: { arg: string }) => api.deleteVoice(id),
+    { ...mutationOptions, populateCache: (res) => res.voices }
+  );
+
+  const handleSaveMapper = (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionError(null);
+    void saveMapper.trigger();
   };
 
   return (
@@ -144,13 +139,16 @@ export function SettingsModal({
               </div>
               <button
                 type="button"
-                onClick={() => void loadAll()}
+                onClick={refreshAll}
                 className="inline-flex items-center gap-1 text-[11px] text-stone-500 hover:text-stone-900"
               >
                 <RefreshCw className="w-3 h-3" /> Refresh
               </button>
             </div>
 
+            {!speechStatus && !speechStatusQuery.error && (
+              <Skeleton className="w-full h-24 rounded-xl" />
+            )}
             {speechStatus && (
               <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -180,12 +178,15 @@ export function SettingsModal({
                   {!speechStatus.serverRunning && speechStatus.installed && (
                     <button
                       type="button"
-                      disabled={warming}
-                      onClick={handleWarmServer}
+                      disabled={warmServer.isMutating}
+                      onClick={() => {
+                        setActionError(null);
+                        void warmServer.trigger();
+                      }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-900 text-white font-semibold hover:bg-stone-800 disabled:opacity-50"
                     >
                       <Play className="w-3 h-3 fill-current" />
-                      {warming ? "Starting…" : "Pre-warm Live Server"}
+                      {warmServer.isMutating ? "Starting…" : "Pre-warm Live Server"}
                     </button>
                   )}
                 </div>
@@ -363,10 +364,10 @@ export function SettingsModal({
                       className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5"
                     >
                       <option value="claude-cli">
-                        Claude Code CLI (Subscription · $0 API{mapperConfig?.claudeCliAvailable ? " ✓" : " — not found"})
+                        Claude Code CLI (Subscription · $0 API{mapperConfig ? (mapperConfig.claudeCliAvailable ? " ✓" : " — not found") : ""})
                       </option>
                       <option value="codex-cli">
-                        Codex CLI (Subscription · $0 API{mapperConfig?.codexCliAvailable ? " ✓" : " — not found"})
+                        Codex CLI (Subscription · $0 API{mapperConfig ? (mapperConfig.codexCliAvailable ? " ✓" : " — not found") : ""})
                       </option>
                       <option value="openai-compatible">
                         OpenAI-Compatible (OpenAI / xAI / Ollama)
@@ -434,10 +435,11 @@ export function SettingsModal({
                 </span>
                 <button
                   type="submit"
-                  disabled={saving}
+                  // Saving before the stored config loads would overwrite it with the form defaults
+                  disabled={!mapperConfig || saveMapper.isMutating}
                   className="px-3.5 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {saving ? "Saving…" : "Save Mapper Config"}
+                  {saveMapper.isMutating ? "Saving…" : "Save Mapper Config"}
                 </button>
               </div>
             </form>
@@ -447,13 +449,15 @@ export function SettingsModal({
           <section className="space-y-2.5">
             <div className="flex items-center gap-2 font-semibold text-stone-800 text-sm">
               <Fingerprint className="w-4 h-4 text-indigo-600" />
-              Enrolled Speaker Voices ({voices.length})
+              Enrolled Speaker Voices ({voices ? voices.length : <Skeleton className="w-3 h-3" />})
             </div>
             <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
               <p className="text-[11px] text-stone-500 leading-relaxed">
                 Whenever you reassign a transcript turn to a named person (or rename a speaker), Dialogger saves a clean voice seed here and prepends it to <strong>Nemotron 3 Diarization</strong> so future windows and future recordings lock onto that speaker automatically.
               </p>
-              {voices.length === 0 ? (
+              {!voices ? (
+                voicesQuery.error ? null : <Skeleton className="w-full h-8" />
+              ) : voices.length === 0 ? (
                 <p className="text-[11px] text-stone-400 italic">
                   No voices enrolled yet — click any speaker pill in a transcript to assign a name and enroll their voice.
                 </p>
@@ -474,10 +478,8 @@ export function SettingsModal({
                       </div>
                       <button
                         type="button"
-                        onClick={async () => {
-                          const res = await api.deleteVoice(v.id);
-                          setVoices(res.voices);
-                        }}
+                        disabled={deleteVoice.isMutating}
+                        onClick={() => void deleteVoice.trigger(v.id)}
                         className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-50"
                         title="Remove enrolled voice"
                       >

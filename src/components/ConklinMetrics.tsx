@@ -5,11 +5,13 @@ import Scale from "lucide-react/icons/scale";
 import Sparkles from "lucide-react/icons/sparkles";
 import { type IBISNodeType } from "@shared/schemas/models";
 import { IBIS_NODE_META, type ConklinMapStats } from "@shared/ibis";
+import { Skeleton } from "@/components/Skeleton";
 
 export type FacilitationLens = "all" | "open-questions" | "contested" | "decisions";
 
 interface ConklinMetricsProps {
-  stats: ConklinMapStats;
+  /** Undefined while the session loads: counts show skeletons, the buttons stay. */
+  stats?: ConklinMapStats;
   lens: FacilitationLens;
   onChangeLens: (lens: FacilitationLens) => void;
   onHighlightNodes?: (ids: string[]) => void;
@@ -41,34 +43,34 @@ export function ConklinMetrics({
           active={lens === "all"}
           onClick={() => onChangeLens("all")}
           label="Full Map"
-          count={stats.totalNodes}
+          count={stats?.totalNodes}
         />
         <LensButton
           active={lens === "open-questions"}
           onClick={() => onChangeLens("open-questions")}
           label="Open Questions"
-          count={stats.openQuestionIds.length}
+          count={stats?.openQuestionIds.length}
           icon={<HelpCircle className="w-3 h-3 text-blue-600" />}
         />
         <LensButton
           active={lens === "contested"}
           onClick={() => onChangeLens("contested")}
           label="Contested"
-          count={stats.contestedIdeaIds.length}
+          count={stats?.contestedIdeaIds.length}
           icon={<Scale className="w-3 h-3 text-amber-600" />}
         />
         <LensButton
           active={lens === "decisions"}
           onClick={() => onChangeLens("decisions")}
           label="Decisions"
-          count={stats.counts.decision}
+          count={stats?.counts.decision}
           icon={<CheckCircle2 className="w-3 h-3 text-indigo-600" />}
         />
       </div>
 
       {/* Right: IBIS Node Type Legend Counts + Top Facilitation Nudge */}
       <div className="flex items-center gap-3 flex-wrap">
-        {stats.nudges.length > 0 && (
+        {stats && stats.nudges.length > 0 && (
           <button
             type="button"
             onClick={() => {
@@ -106,7 +108,7 @@ export function ConklinMetrics({
                 }}
               >
                 <span className="font-bold leading-none">{meta.symbol}</span>
-                <span>{stats.counts[t]}</span>
+                {stats ? <span>{stats.counts[t]}</span> : <Skeleton className="w-2.5 h-2.5" />}
               </span>
             );
           })}
@@ -126,7 +128,8 @@ function LensButton({
   active: boolean;
   onClick: () => void;
   label: string;
-  count: number;
+  /** Undefined while loading */
+  count?: number;
   icon?: React.ReactNode;
 }) {
   return (
@@ -146,7 +149,7 @@ function LensButton({
           active ? "bg-white/20 text-white" : "bg-stone-100 text-stone-500"
         }`}
       >
-        {count}
+        {count ?? <Skeleton className="w-2.5 h-2" />}
       </span>
     </button>
   );

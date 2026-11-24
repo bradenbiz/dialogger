@@ -12,6 +12,8 @@ import { AppendTurnsRequestSchema, IBISOpBatchSchema } from "../shared/schemas/c
 import "../shared/schemas/events";
 import { toOpenApiComponents } from "../shared/schemas/registry";
 import { readFormData } from "../server/lib/http";
+import { reduceSessionEvent } from "../src/lib/queries";
+import type { DialogueSession } from "../shared/schemas/models";
 
 let testDataDir: string;
 
@@ -662,5 +664,52 @@ describe("readFormData upload cap", () => {
       body: "{}",
     });
     expect(((await readFormData(req)) as Response).status).toBe(400);
+  });
+});
+
+describe("reduceSessionEvent (query cache updates from SSE)", () => {
+  const base: DialogueSession = {
+    id: "s1",
+    title: "T",
+    createdAt: "",
+    updatedAt: "",
+    speakers: [{ id: "speaker_2", channel: 2, name: "B", color: "#000" }],
+    turns: [
+      { id: "t1", speakerId: "speaker_2", text: "hi", startSec: 0, endSec: 1, source: "live", createdAt: "", mapped: false },
+    ],
+    nodes: [],
+    crossLinks: [],
+    hostContext: [],
+    activity: [],
+    speechConfig: { streamingAsrModel: "a", offlineAsrModel: "b", diarizationModel: "c" },
+    autoMap: true,
+  };
+
+  it("appends new turns once and ignores duplicates", () => {
+    const turn = { ...base.turns[0], id: "t2" };
+    const once = reduceSessionEvent(base, { type: "transcript.turn", turn });
+    expect(once.turns.map((t) => t.id)).toEqual(["t1", "t2"]);
+    expect(reduceSessionEvent(once, { type: "transcript.turn", turn })).toBe(once);
+  });
+
+  it("marks turns referenced by map nodes as mapped", () => {
+    const node = {
+      id: "n1", type: "question" as const, label: "Q", parentId: null, turnIds: ["t1"],
+      speakerIds: [], createdAt: "", updatedAt: "", createdBy: "model" as const,
+    };
+    const next = reduceSessionEvent(base, {
+      type: "map.updated", nodes: [node], crossLinks: [], affectedNodeIds: ["n1"],
+    });
+    expect(next.nodes).toHaveLength(1);
+    expect(next.turns[0].mapped).toBe(true);
+  });
+
+  it("inserts new speakers in channel order and leaves status events alone", () => {
+    const next = reduceSessionEvent(base, {
+      type: "speaker.updated",
+      speaker: { id: "speaker_1", channel: 1, name: "A", color: "#111" },
+    });
+    expect(next.speakers.map((s) => s.channel)).toEqual([1, 2]);
+    expect(reduceSessionEvent(base, { type: "speech.status", state: "idle" })).toBe(base);
   });
 });

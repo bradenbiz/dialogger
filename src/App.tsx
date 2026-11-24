@@ -6,7 +6,16 @@ import {
   type TranscriptTurn,
 } from "@shared/schemas/models";
 import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
-import { api, ApiError, type SessionSummary } from "@/lib/api";
+import { api } from "@/lib/api";
+import {
+  applySessionEvent,
+  cacheSession,
+  forgetSession,
+  invalidateSessions,
+  isUnauthorized,
+  useSession,
+  useSessions,
+} from "@/lib/queries";
 import type { LiveMicController } from "@/lib/audio-capture";
 import { TopBar } from "@/components/TopBar";
 import {
@@ -14,17 +23,28 @@ import {
   type FacilitationLens,
 } from "@/components/ConklinMetrics";
 import { HostContextBar } from "@/components/HostContextBar";
-import { TranscriptPanel } from "@/components/TranscriptPanel";
-import { DialogueMapCanvas } from "@/components/DialogueMapCanvas";
+import { TranscriptPanel, TranscriptPanelSkeleton } from "@/components/TranscriptPanel";
+import {
+  DialogueMapCanvas,
+  DialogueMapCanvasPlaceholder,
+} from "@/components/DialogueMapCanvas";
 import { NodeInspector } from "@/components/NodeInspector";
-import { AgentModal, SettingsModal, YouTubeModal } from "@/components/panels";
+import { AgentModal, SettingsModal, SignInScreen, YouTubeModal } from "@/components/panels";
 import { closePanel, openPanel, useUrlState } from "@/lib/url-state";
 
 export function App() {
   const [url, setUrl] = useUrlState();
 
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [session, setSession] = useState<DialogueSession | null>(null);
+  // Server state lives in the SWR cache; the open session's live SSE stream
+  // writes into it (applySessionEvent), so `session` is always the cached copy.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const sessionsQuery = useSessions();
+  const sessions = sessionsQuery.data;
+  const sessionQuery = useSession(activeSessionId);
+  const session = sessionQuery.data;
+  // Still showing the previous session while the newly selected one loads (keepPreviousData).
+  // Compared by id, not isLoading: the live stream's snapshot can fill the cache first.
+  const isSwitching = session !== undefined && session.id !== activeSessionId;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(
     new Set()
@@ -47,10 +67,8 @@ export function App() {
 
   const [playingTurnId, setPlayingTurnId] = useState<string | null>(null);
   const [seekRequest, setSeekRequest] = useState<{ sec: number; nonce: number } | null>(null);
-  const [authRequired, setAuthRequired] = useState(false);
-  const [authTokenInput, setAuthTokenInput] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authNonce, setAuthNonce] = useState(0);
+  const authRequired =
+    isUnauthorized(sessionsQuery.error) || isUnauthorized(sessionQuery.error);
 
   const micRef = useRef<LiveMicController | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -62,205 +80,90 @@ export function App() {
     }, 6500);
   }, []);
 
-  const refreshSessionsList = useCallback(async () => {
-    try {
-      const { sessions: list } = await api.listSessions();
-      setSessions(list);
-      return list;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setAuthRequired(true);
-        throw err;
-      }
-      return [];
-    }
+  /** Shows a session the server just returned (cache it, then make it the open one). */
+  const showSession = useCallback((next: DialogueSession) => {
+    cacheSession(next);
+    setActiveSessionId(next.id);
   }, []);
 
-  // Bootstrap: honor ?session=<id> URL param or load latest session
+  // Bootstrap once the session list loads: honor ?session=<id>, else open the latest,
+  // else create a first session.
   useEffect(() => {
+    if (activeSessionId || !sessionsQuery.data) return;
+    const list = sessionsQuery.data;
+    const urlId = new URLSearchParams(window.location.search).get("session");
+    const targetId =
+      (urlId && list.find((s) => s.id === urlId)?.id) || list[0]?.id;
+    if (targetId) {
+      setActiveSessionId(targetId);
+      return;
+    }
     let active = true;
-    void (async () => {
-      try {
-        const list = await refreshSessionsList();
-        const urlId = new URLSearchParams(window.location.search).get("session");
-        const targetId =
-          (urlId && list.find((s) => s.id === urlId)?.id) || list[0]?.id;
-
-        if (targetId) {
-          const { session: loaded } = await api.getSession(targetId);
-          if (active) setSession(loaded);
-        } else {
-          const { session: created } = await api.createSession({
-            title: "New Dialogue Map",
-          });
-          if (active) {
-            setSession(created);
-            await refreshSessionsList();
-          }
-        }
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          if (active) setAuthRequired(true);
-          return;
-        }
-        if (active) {
-          showError(err instanceof Error ? err.message : String(err));
-        }
-      }
-    })();
+    void api
+      .createSession({ title: "New Dialogue Map" })
+      .then(({ session: created }) => {
+        if (!active) return;
+        showSession(created);
+        void invalidateSessions();
+      })
+      .catch((err) => showError(err instanceof Error ? err.message : String(err)));
     return () => {
       active = false;
     };
-  }, [refreshSessionsList, showError, authNonce]);
+  }, [activeSessionId, sessionsQuery.data, showSession, showError]);
+
+  // A failed load keeps the previous session as `data` (keepPreviousData), which would leave
+  // the switching overlay up for good: go back to the session still on screen instead.
+  useEffect(() => {
+    const err = sessionQuery.error;
+    if (!err || isUnauthorized(err)) return;
+    showError(err.message);
+    if (session && activeSessionId && session.id !== activeSessionId) {
+      forgetSession(activeSessionId);
+      setUrl({ session: session.id }, { replace: true });
+      setActiveSessionId(session.id);
+      void invalidateSessions();
+    }
+  }, [sessionQuery.error, showError]);
 
   // Keep ?session= in step with the open session. Switching sessions adds a history entry,
   // so Back/Forward move between them; the first sync (no or stale id in the URL) replaces.
   useEffect(() => {
-    if (!session?.id || url.session === session.id) return;
-    setUrl({ session: session.id }, { replace: !url.session });
-  }, [session?.id]);
+    if (!activeSessionId || url.session === activeSessionId) return;
+    setUrl({ session: activeSessionId }, { replace: !url.session });
+  }, [activeSessionId]);
 
-  // Back/Forward (or an edited URL) changed ?session=: load that session.
+  // Back/Forward (or an edited URL) changed ?session=: open that session.
   useEffect(() => {
-    if (!session || !url.session || url.session === session.id) return;
-    void api
-      .getSession(url.session)
-      .then(({ session: loaded }) => setSession(loaded))
-      // Unknown id: point the URL back at the session that's open
-      .catch(() => setUrl({ session: session.id }, { replace: true }));
+    if (!activeSessionId || !url.session || url.session === activeSessionId) return;
+    if (sessions?.some((s) => s.id === url.session)) setActiveSessionId(url.session);
+    // Unknown id: point the URL back at the session that's open
+    else setUrl({ session: activeSessionId }, { replace: true });
   }, [url.session]);
 
   // Live SSE Subscription for the active session
   useEffect(() => {
-    if (!session?.id) return;
+    if (!activeSessionId) return;
+    const sessionId = activeSessionId;
 
-    const unsubscribe = api.subscribeToSession(session.id, (evt) => {
+    const unsubscribe = api.subscribeToSession(sessionId, (evt) => {
+      // Session data goes into the query cache; UI-only side effects are handled here.
+      applySessionEvent(sessionId, evt);
       switch (evt.type) {
-        case "session.snapshot":
-          setSession(evt.session);
-          break;
-
-        case "session.updated":
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  title: evt.title,
-                  rootFocus: evt.rootFocus,
-                  autoMap: evt.autoMap,
-                }
-              : prev
-          );
-          void refreshSessionsList();
-          break;
-
-        case "session.audio":
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  audio: evt.audio,
-                  updatedAt: new Date().toISOString(),
-                }
-              : prev
-          );
-          break;
-
-        case "session.context_updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const hostSet = new Set(evt.hostTurnIds || []);
-            return {
-              ...prev,
-              hostContext: evt.hostContext,
-              turns:
-                hostSet.size > 0
-                  ? prev.turns.map((t) =>
-                      hostSet.has(t.id) ? { ...t, kind: "host_context" } : t
-                    )
-                  : prev.turns,
-            };
-          });
-          break;
-
-        case "speaker.updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const exists = prev.speakers.some((s) => s.id === evt.speaker.id);
-            const speakers = exists
-              ? prev.speakers.map((s) =>
-                  s.id === evt.speaker.id ? evt.speaker : s
-                )
-              : [...prev.speakers, evt.speaker].sort(
-                  (a, b) => a.channel - b.channel
-                );
-            return { ...prev, speakers };
-          });
-          break;
-
         case "transcript.partial":
           setPartialText(evt.text);
           break;
 
         case "transcript.turn":
-          setPartialText("");
-          setSession((prev) => {
-            if (!prev) return prev;
-            if (prev.turns.some((t) => t.id === evt.turn.id)) return prev;
-            return { ...prev, turns: [...prev.turns, evt.turn] };
-          });
-          break;
-
-        case "transcript.turn_updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              turns: prev.turns.map((t) =>
-                t.id === evt.turn.id ? evt.turn : t
-              ),
-            };
-          });
-          break;
-
         case "transcript.turns_batch":
           setPartialText("");
-          setSession((prev) => {
-            if (!prev) return prev;
-            const existingIds = new Set(prev.turns.map((t) => t.id));
-            const fresh = evt.turns.filter((t) => !existingIds.has(t.id));
-            return { ...prev, turns: [...prev.turns, ...fresh] };
-          });
           break;
 
         case "map.updated":
-          setSession((prev) => {
-            if (!prev) return prev;
-            const activity = evt.activity
-              ? [...prev.activity.slice(-79), evt.activity]
-              : prev.activity;
-            // Mark turns referenced by nodes as mapped locally too
-            const referencedTurns = new Set<string>();
-            for (const n of evt.nodes) {
-              for (const tid of n.turnIds) referencedTurns.add(tid);
-            }
-            const turns = prev.turns.map((t) =>
-              referencedTurns.has(t.id) ? { ...t, mapped: true } : t
-            );
-            return {
-              ...prev,
-              nodes: evt.nodes,
-              crossLinks: evt.crossLinks,
-              activity,
-              turns,
-            };
-          });
           if (evt.affectedNodeIds.length > 0) {
-            const set = new Set(evt.affectedNodeIds);
-            setRecentNodeIds(set);
+            setRecentNodeIds(new Set(evt.affectedNodeIds));
             setTimeout(() => setRecentNodeIds(new Set()), 1500);
           }
-          void refreshSessionsList();
           break;
 
         case "mapper.status":
@@ -285,13 +188,11 @@ export function App() {
     return () => {
       unsubscribe();
     };
-  }, [session?.id, refreshSessionsList, showError]);
+  }, [activeSessionId, showError]);
 
   const stats = useMemo(
     () =>
-      session
-        ? computeConklinStats(session.nodes, session.turns)
-        : computeConklinStats([], []),
+      session ? computeConklinStats(session.nodes, session.turns) : undefined,
     [session]
   );
 
@@ -314,8 +215,7 @@ export function App() {
     setHighlightedNodeIds(new Set());
     setActiveSpeakerFilter(null);
     setLens("all");
-    const { session: loaded } = await api.getSession(id);
-    setSession(loaded);
+    setActiveSessionId(id);
   };
 
   const handleCreateSession = async () => {
@@ -325,15 +225,15 @@ export function App() {
     const { session: created } = await api.createSession({
       title: "New Dialogue Map",
     });
-    setSession(created);
+    showSession(created);
     setSelectedNodeId(null);
-    await refreshSessionsList();
+    await invalidateSessions();
   };
 
   const handleDeleteSession = async (id: string) => {
     await api.deleteSession(id);
-    const remaining = await refreshSessionsList();
-    if (session?.id === id && remaining[0]) {
+    const remaining = await invalidateSessions();
+    if (session?.id === id && remaining?.[0]) {
       await handleSelectSession(remaining[0].id);
     }
   };
@@ -380,12 +280,12 @@ export function App() {
         autoMap: session.autoMap,
       });
       targetSession = created;
-      setSession(created);
+      showSession(created);
       setSelectedNodeId(null);
       setHighlightedNodeIds(new Set());
       setActiveSpeakerFilter(null);
       setLens("all");
-      await refreshSessionsList();
+      await invalidateSessions();
     }
 
     setIsTranscribing(true);
@@ -395,7 +295,7 @@ export function App() {
         diarizationModel: targetSession.speechConfig.diarizationModel,
         autoMap: targetSession.autoMap,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -419,8 +319,8 @@ export function App() {
         autoMap: session.autoMap,
       });
       targetSession = created;
-      setSession(created);
-      await refreshSessionsList();
+      showSession(created);
+      await invalidateSessions();
     }
 
     setIsTranscribing(true);
@@ -439,7 +339,7 @@ export function App() {
         autoMap: targetSession.autoMap,
         clearExisting: !params.createNewSession && targetSession.turns.length > 0,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -460,7 +360,7 @@ export function App() {
         autoMap: session.autoMap,
         clearExisting: startSec === 0 && session.turns.length > 0,
       });
-      await refreshSessionsList();
+      await invalidateSessions();
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -505,8 +405,8 @@ export function App() {
           title: "Live Demo",
         });
         targetSession = created;
-        setSession(created);
-        await refreshSessionsList();
+        showSession(created);
+        await invalidateSessions();
       }
       setSelectedNodeId(null);
       setHighlightedNodeIds(new Set());
@@ -559,242 +459,245 @@ export function App() {
 
   if (authRequired) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#FAF9F6] p-4">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setAuthError(null);
-            try {
-              await api.authLogin(authTokenInput.trim());
-              setAuthRequired(false);
-              setAuthTokenInput("");
-              setAuthNonce((n) => n + 1);
-            } catch (err) {
-              setAuthError(
-                err instanceof Error ? err.message : "Invalid access token"
-              );
-            }
-          }}
-          className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl shadow-sm p-6 space-y-4"
-        >
-          <div>
-            <h1 className="font-display text-lg font-semibold text-stone-900">
-              Sign in to Dialogger
-            </h1>
-            <p className="text-xs text-stone-500 mt-1">
-              Enter the server&apos;s <code className="font-mono-code">DIALOGGER_API_KEY</code> to access sessions, audio, and live mapping.
-            </p>
-          </div>
-          <input
-            type="password"
-            value={authTokenInput}
-            onChange={(e) => setAuthTokenInput(e.target.value)}
-            placeholder="Access token"
-            autoFocus
-            className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:border-blue-500"
-          />
-          {authError && (
-            <div className="text-xs text-rose-600 font-medium">{authError}</div>
-          )}
-          <button
-            type="submit"
-            className="w-full py-2 rounded-lg bg-stone-900 text-white text-sm font-medium hover:bg-stone-800 transition"
-          >
-            Unlock
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center bg-[#FAF9F6] text-stone-500 text-sm">
-        Loading Dialogger…
-      </div>
+      <Suspense fallback={<div className="w-screen h-screen bg-[#FAF9F6]" />}>
+        <SignInScreen />
+      </Suspense>
     );
   }
 
   return (
-    <div className="w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6]">
-      {/* Hidden input for empty-state upload CTA */}
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept="audio/*,video/*,.wav,.mp3,.m4a,.ogg,.flac,.webm,.mp4"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void handleUploadAudio(f);
-          e.target.value = "";
-        }}
-      />
-
-      <TopBar
-        session={session}
-        sessions={sessions}
-        isListening={isListening}
-        micLevel={micLevel}
-        isTranscribing={isTranscribing}
-        isDemoRunning={isDemoRunning}
-        speechMessage={speechMessage}
-        mapperBusy={mapperBusy}
-        mapperMessage={mapperMessage}
-        onSelectSession={(id) => void handleSelectSession(id)}
-        onCreateSession={() => void handleCreateSession()}
-        onDeleteSession={(id) => void handleDeleteSession(id)}
-        onRenameSession={(title) =>
-          void api.updateSession(session.id, { title })
-        }
-        onToggleMic={() => void handleToggleMic()}
-        onUploadAudio={(f) => void handleUploadAudio(f)}
-        onOpenYouTubeModal={() => openPanel("youtube")}
-        onStopTranscribing={() => void api.stopTranscription(session.id)}
-        onToggleDemo={() => void handleToggleDemo()}
-        onOpenAgentModal={() => openPanel("agent")}
-        onOpenSettings={() => openPanel("settings")}
-      />
-
-      <ConklinMetrics
-        stats={stats}
-        lens={lens}
-        onChangeLens={(next) => {
-          setLens(next);
-          setHighlightedNodeIds(new Set());
-        }}
-        onHighlightNodes={(ids) => {
-          setHighlightedNodeIds(new Set(ids));
-          if (ids[0]) setSelectedNodeId(ids[0]);
-        }}
-      />
-
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <TranscriptPanel
-          session={session}
-          partialText={partialText}
-          highlightedTurnIds={highlightedTurnIds}
-          playingTurnId={playingTurnId}
-          seekRequest={seekRequest}
-          activeSpeakerFilter={activeSpeakerFilter}
-          mapperBusy={mapperBusy}
-          isTranscribing={isTranscribing}
-          onAudioTimeUpdate={handleAudioTimeUpdate}
-          onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
-          onTrimAudio={async (params) => {
-            try {
-              const { session: updated } = await api.trimSessionAudio(
-                session.id,
-                params
-              );
-              setSession(updated);
-              setSelectedNodeId(null);
-              setHighlightedNodeIds(new Set());
-              await refreshSessionsList();
-            } catch (err) {
-              showError(err instanceof Error ? err.message : String(err));
-            }
+    <>
+      {/* While switching, the previous session is still on screen: inert blocks mouse and
+          keyboard so no action runs against it. The toast stays outside, so it can be dismissed. */}
+      <div
+        className={`w-screen h-screen flex flex-col overflow-hidden bg-[#FAF9F6] transition-opacity ${
+          isSwitching ? "opacity-60" : ""
+        }`}
+        inert={isSwitching}
+        aria-busy={isSwitching}
+      >
+        {/* Hidden input for empty-state upload CTA */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="audio/*,video/*,.wav,.mp3,.m4a,.ogg,.flac,.webm,.mp4"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleUploadAudio(f);
+            e.target.value = "";
           }}
-          onStopTranscribing={() => void api.stopTranscription(session.id)}
-          onSelectTurn={handleSelectTurn}
-          onReassignTurnSpeaker={(turnId, patch) =>
-            void api.updateTurnSpeaker(session.id, turnId, patch)
-          }
-          onFilterSpeaker={(spkId) => {
-            setActiveSpeakerFilter(spkId);
-            setHighlightedNodeIds(new Set());
-          }}
-          onRenameSpeaker={(spkId, name) =>
-            void api.renameSpeaker(session.id, spkId, name)
-          }
-          onSubmitManualTurn={async (speakerChannel, text) => {
-            await api.addTurn(
-              session.id,
-              { speakerChannel, text, source: "manual" },
-              session.autoMap
-            );
-          }}
-          onToggleAutoMap={(autoMap) =>
-            void api.updateSession(session.id, { autoMap })
-          }
-          onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
-          onDropAudioFile={(f) => void handleUploadAudio(f)}
         />
 
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          <HostContextBar
-            items={session.hostContext || []}
-            speakers={session.speakers}
-            onAddContext={(category: HostContextCategory, summary: string) =>
+        <TopBar
+          session={session}
+          sessions={sessions}
+          isListening={isListening}
+          micLevel={micLevel}
+          isTranscribing={isTranscribing}
+          isDemoRunning={isDemoRunning}
+          speechMessage={speechMessage}
+          mapperBusy={mapperBusy}
+          mapperMessage={mapperMessage}
+          onSelectSession={(id) => void handleSelectSession(id)}
+          onCreateSession={() => void handleCreateSession()}
+          onDeleteSession={(id) => void handleDeleteSession(id)}
+          onRenameSession={(title) => {
+            if (session) void api.updateSession(session.id, { title });
+          }}
+          onToggleMic={() => void handleToggleMic()}
+          onUploadAudio={(f) => void handleUploadAudio(f)}
+          onOpenYouTubeModal={() => openPanel("youtube")}
+          onStopTranscribing={() => {
+            if (session) void api.stopTranscription(session.id);
+          }}
+          onToggleDemo={() => void handleToggleDemo()}
+          onOpenAgentModal={() => openPanel("agent")}
+          onOpenSettings={() => openPanel("settings")}
+        />
+
+        <ConklinMetrics
+          stats={stats}
+          lens={lens}
+          onChangeLens={(next) => {
+            setLens(next);
+            setHighlightedNodeIds(new Set());
+          }}
+          onHighlightNodes={(ids) => {
+            setHighlightedNodeIds(new Set(ids));
+            if (ids[0]) setSelectedNodeId(ids[0]);
+          }}
+        />
+
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {session ? (
+            <TranscriptPanel
+              session={session}
+              partialText={partialText}
+              highlightedTurnIds={highlightedTurnIds}
+              playingTurnId={playingTurnId}
+              seekRequest={seekRequest}
+              activeSpeakerFilter={activeSpeakerFilter}
+              mapperBusy={mapperBusy}
+              isTranscribing={isTranscribing}
+              onAudioTimeUpdate={handleAudioTimeUpdate}
+              onTranscribeSavedAudio={(sec) => void handleTranscribeSavedAudio(sec)}
+              onTrimAudio={async (params) => {
+                try {
+                  const { session: updated } = await api.trimSessionAudio(
+                    session.id,
+                    params
+                  );
+                  cacheSession(updated);
+                  setSelectedNodeId(null);
+                  setHighlightedNodeIds(new Set());
+                  await invalidateSessions();
+                } catch (err) {
+                  showError(err instanceof Error ? err.message : String(err));
+                }
+              }}
+              onStopTranscribing={() => void api.stopTranscription(session.id)}
+              onSelectTurn={handleSelectTurn}
+              onReassignTurnSpeaker={(turnId, patch) =>
+                void api.updateTurnSpeaker(session.id, turnId, patch)
+              }
+              onFilterSpeaker={(spkId) => {
+                setActiveSpeakerFilter(spkId);
+                setHighlightedNodeIds(new Set());
+              }}
+              onRenameSpeaker={(spkId, name) =>
+                void api.renameSpeaker(session.id, spkId, name)
+              }
+              onSubmitManualTurn={async (speakerChannel, text) => {
+                await api.addTurn(
+                  session.id,
+                  { speakerChannel, text, source: "manual" },
+                  session.autoMap
+                );
+              }}
+              onToggleAutoMap={(autoMap) =>
+                void api.updateSession(session.id, { autoMap })
+              }
+              onAnalyzeUnmapped={() => void api.analyzeMap(session.id, false)}
+              onDropAudioFile={(f) => void handleUploadAudio(f)}
+            />
+          ) : (
+            <TranscriptPanelSkeleton />
+          )}
+
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+            <HostContextBar
+              items={session?.hostContext}
+              speakers={session?.speakers}
+              onAddContext={(category: HostContextCategory, summary: string) => {
+                if (!session) return;
+                void api.applyMapOps(session.id, {
+                  actor: "human",
+                  summary: `Added session ${category.replace(/_/g, " ")} context`,
+                  ops: [{ op: "add_host_context", category, summary }],
+                });
+              }}
+              onRemoveContext={(id: string) => {
+                if (!session) return;
+                void api.applyMapOps(session.id, {
+                  actor: "human",
+                  ops: [{ op: "remove_host_context", id }],
+                });
+              }}
+              onFocusTurn={(turnId) => {
+                const turn = session?.turns.find((t) => t.id === turnId);
+                if (turn) handleSelectTurn(turn);
+              }}
+            />
+
+            {session && stats ? (
+              <DialogueMapCanvas
+                session={session}
+                stats={stats}
+                lens={lens}
+                activeSpeakerFilter={activeSpeakerFilter}
+                selectedNodeId={selectedNodeId}
+                highlightedNodeIds={highlightedNodeIds}
+                recentNodeIds={recentNodeIds}
+                onSelectNode={(id) => {
+                  setSelectedNodeId(id);
+                  if (!id) setHighlightedNodeIds(new Set());
+                }}
+                onQuickAddChild={(parentId, type) =>
+                  void handleQuickAddChild(parentId, type)
+                }
+                onStartDemo={() => void handleToggleDemo()}
+                onTriggerUpload={() => uploadInputRef.current?.click()}
+                onOpenYouTube={() => openPanel("youtube")}
+              />
+            ) : (
+              <DialogueMapCanvasPlaceholder />
+            )}
+          </div>
+
+          <NodeInspector
+            session={session}
+            selectedNode={selectedNode}
+            onClose={() => setSelectedNodeId(null)}
+            onUpdateNode={(id, patch) => {
+              if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
-                summary: `Added session ${category.replace(/_/g, " ")} context`,
-                ops: [{ op: "add_host_context", category, summary }],
-              })
-            }
-            onRemoveContext={(id: string) =>
+                ops: [{ op: "update_node", id, ...patch }],
+              });
+            }}
+            onDeleteNode={(id) => {
+              setSelectedNodeId(null);
+              if (!session) return;
               void api.applyMapOps(session.id, {
                 actor: "human",
-                ops: [{ op: "remove_host_context", id }],
-              })
-            }
+                summary: "Removed node branch",
+                ops: [{ op: "delete_node", id, cascade: true }],
+              });
+            }}
+            onAddChild={(parentId, type, label) => {
+              if (!session) return;
+              void api.applyMapOps(session.id, {
+                actor: "human",
+                summary: `Added ${IBIS_NODE_META[type].shortName} node`,
+                ops: [{ op: "add_node", parentId, type, label }],
+              });
+            }}
             onFocusTurn={(turnId) => {
-              const turn = session.turns.find((t) => t.id === turnId);
+              const turn = session?.turns.find((t) => t.id === turnId);
               if (turn) handleSelectTurn(turn);
             }}
-          />
-
-          <DialogueMapCanvas
-            session={session}
-            stats={stats}
-            lens={lens}
-            activeSpeakerFilter={activeSpeakerFilter}
-            selectedNodeId={selectedNodeId}
-            highlightedNodeIds={highlightedNodeIds}
-            recentNodeIds={recentNodeIds}
-            onSelectNode={(id) => {
-              setSelectedNodeId(id);
-              if (!id) setHighlightedNodeIds(new Set());
-            }}
-            onQuickAddChild={(parentId, type) =>
-              void handleQuickAddChild(parentId, type)
-            }
-            onStartDemo={() => void handleToggleDemo()}
-            onTriggerUpload={() => uploadInputRef.current?.click()}
-            onOpenYouTube={() => openPanel("youtube")}
+            onSelectNode={(id) => setSelectedNodeId(id)}
           />
         </div>
 
-        <NodeInspector
-          session={session}
-          selectedNode={selectedNode}
-          onClose={() => setSelectedNodeId(null)}
-          onUpdateNode={(id, patch) =>
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              ops: [{ op: "update_node", id, ...patch }],
-            })
-          }
-          onDeleteNode={(id) => {
-            setSelectedNodeId(null);
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              summary: "Removed node branch",
-              ops: [{ op: "delete_node", id, cascade: true }],
-            });
-          }}
-          onAddChild={(parentId, type, label) =>
-            void api.applyMapOps(session.id, {
-              actor: "human",
-              summary: `Added ${IBIS_NODE_META[type].shortName} node`,
-              ops: [{ op: "add_node", parentId, type, label }],
-            })
-          }
-          onFocusTurn={(turnId) => {
-            const turn = session.turns.find((t) => t.id === turnId);
-            if (turn) handleSelectTurn(turn);
-          }}
-          onSelectNode={(id) => setSelectedNodeId(id)}
-        />
+        {/* Panels load on demand (see components/panels.tsx) */}
+        <Suspense fallback={null}>
+          {session && url.panel === "agent" && (
+            <AgentModal session={session} onClose={closePanel} />
+          )}
+
+          {session && url.panel === "settings" && (
+            <SettingsModal
+              session={session}
+              onClose={closePanel}
+              onUpdateSpeechConfig={async (patch) => {
+                const { session: updated } = await api.updateSession(session.id, {
+                  speechConfig: patch,
+                });
+                cacheSession(updated);
+              }}
+            />
+          )}
+
+          {session && url.panel === "youtube" && (
+            <YouTubeModal
+              session={session}
+              onClose={closePanel}
+              onStartImport={(params) => handleImportYouTube(params)}
+            />
+          )}
+        </Suspense>
       </div>
 
       {/* Error Toast */}
@@ -805,39 +708,12 @@ export function App() {
             type="button"
             onClick={() => setToastError(null)}
             className="text-rose-300 hover:text-white font-bold"
+            aria-label="Dismiss error"
           >
             ✕
           </button>
         </div>
       )}
-
-      {/* Panels load on demand (see components/panels.tsx) */}
-      <Suspense fallback={null}>
-        {url.panel === "agent" && (
-          <AgentModal session={session} onClose={closePanel} />
-        )}
-
-        {url.panel === "settings" && (
-          <SettingsModal
-            session={session}
-            onClose={closePanel}
-            onUpdateSpeechConfig={async (patch) => {
-              const { session: updated } = await api.updateSession(session.id, {
-                speechConfig: patch,
-              });
-              setSession(updated);
-            }}
-          />
-        )}
-
-        {url.panel === "youtube" && (
-          <YouTubeModal
-            session={session}
-            onClose={closePanel}
-            onStartImport={(params) => handleImportYouTube(params)}
-          />
-        )}
-      </Suspense>
-    </div>
+    </>
   );
 }
