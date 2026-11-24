@@ -14,7 +14,7 @@ import {
   type TranscriptTurn,
 } from "@shared/schemas/models";
 import { IBIS_NODE_META, LEGAL_IBIS_CHILDREN } from "@shared/ibis";
-import { formatTime } from "@/lib/export";
+import { formatTime } from "@/lib/format";
 
 interface NodeInspectorProps {
   session: DialogueSession;

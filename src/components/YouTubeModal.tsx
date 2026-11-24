@@ -6,7 +6,7 @@ import X from "lucide-react/icons/x";
 import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import { api, type YouTubeMetadata } from "@/lib/api";
-import { formatTime } from "@/lib/export";
+import { formatTime } from "@/lib/format";
 
 interface YouTubeModalProps {
   session: DialogueSession;

@@ -7,10 +7,7 @@ import {
 } from "@shared/schemas/models";
 import { computeConklinStats, IBIS_NODE_META } from "@shared/ibis";
 import { api, ApiError, type SessionSummary } from "@/lib/api";
-import {
-  startLiveMicCapture,
-  type LiveMicController,
-} from "@/lib/audio-capture";
+import type { LiveMicController } from "@/lib/audio-capture";
 import { TopBar } from "@/components/TopBar";
 import {
   ConklinMetrics,
@@ -342,6 +339,8 @@ export function App() {
 
     try {
       setIsListening(true);
+      // Mic capture (AudioWorklet + WebSocket) only loads the first time the mic is turned on.
+      const { startLiveMicCapture } = await import("@/lib/audio-capture");
       const controller = await startLiveMicCapture(session.id, {
         onLevel: setMicLevel,
         onStatus: setSpeechMessage,

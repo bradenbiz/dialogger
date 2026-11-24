@@ -14,11 +14,9 @@ import Upload from "lucide-react/icons/upload";
 import { YoutubeIcon as Youtube } from "@/components/YoutubeIcon";
 import type { DialogueSession } from "@shared/schemas/models";
 import type { SessionSummary } from "@/lib/api";
-import {
-  exportMapAsMarkdown,
-  exportMapAsSvg,
-  exportSessionAsJson,
-} from "@/lib/export";
+
+/** The exporters only load when the user picks one from the Export menu. */
+const loadExport = () => import("@/lib/export");
 
 interface TopBarProps {
   session: DialogueSession;
@@ -358,7 +356,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportMapAsSvg(session);
+                    void loadExport().then((m) => m.exportMapAsSvg(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -368,7 +366,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportMapAsMarkdown(session);
+                    void loadExport().then((m) => m.exportMapAsMarkdown(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >
@@ -378,7 +376,7 @@ export function TopBar({
                   type="button"
                   onClick={() => {
                     setExportOpen(false);
-                    exportSessionAsJson(session);
+                    void loadExport().then((m) => m.exportSessionAsJson(session));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-stone-50 text-stone-700 font-medium"
                 >

@@ -15,7 +15,7 @@ import UploadCloud from "lucide-react/icons/cloud-upload";
 import Users from "lucide-react/icons/users";
 import Volume2 from "lucide-react/icons/volume-2";
 import type { DialogueSession, Speaker, TranscriptTurn } from "@shared/schemas/models";
-import { formatTime } from "@/lib/export";
+import { formatTime } from "@/lib/format";
 import { AudioScrubber } from "./AudioScrubber";
 
 interface TranscriptPanelProps {
